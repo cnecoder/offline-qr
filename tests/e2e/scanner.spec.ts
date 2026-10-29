@@ -31,6 +31,8 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.getByTestId('dropzone')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeVisible()
     await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(0\)/)
+    // 浏览器形态:屏幕选区按钮隐藏(仅桌面版提供)
+    await expect(page.getByTestId('region-button')).toBeHidden()
   })
 
   test('粘贴二维码截图:识别 URL,提供打开链接与复制', async ({ page }) => {
