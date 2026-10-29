@@ -32,7 +32,7 @@ v1 无任何 Rust 业务逻辑:Rust 壳只负责窗口与打包;识别、历史�
 | Rust 侧依赖 | screenshots(截屏)、image(png 编码)、base64 | MIT / Apache-2.0 |
 | 前端 Tauri API | @tauri-apps/api(invoke/event/window) | MIT/APACHE-2.0 |
 | 单文件产物 | vite-plugin-singlefile | MIT |
-| 测试辅助 | qrcode(仅 devDep,为 smoke 测试生成样张) | MIT |
+| 生成 | qrcode(矩阵生成)+ 自研 SVG 渲染器(样式化:形状/渐变/眼睛/Logo) | MIT |
 
 注:jsQR 不采用(引擎决策记录于 task.md 2026-10-30);`qrcode` 库仅为测试依赖,后期生成模块转正式依赖。
 
@@ -45,18 +45,15 @@ E:\Project\QR
 │   ├── architecture.md
 │   └── ui-design.md
 ├── scripts/
-│   ├── gen-icon.mjs           应用图标生成(Node zlib 手写 PNG)
-│   └── smoke-test.mjs         node 端识别管线自测
+│   └── gen-icon.mjs           应用图标生成(Node zlib 手写 PNG)
 ├── src/                       前端核心(TypeScript)
-│   ├── main.ts                装配入口
+│   ├── main.ts                入口分发(主窗 / 屏幕选区遮罩窗)
+│   ├── app.ts                 主窗装配(双 Tab 切换 + 识别面板 + region 事件)
 │   ├── styles/style.css
-│   ├── shared/status.ts       轻提示 / 进度行
-│   └── scanner/
-│       ├── engine.ts          Worker 封装:decodeBitmap()
-│       ├── worker.ts          Worker 内:WASM 初始化 + 解码
-│       ├── ingest.ts          File/Blob → ImageBitmap(+缩略图)
-│       ├── results.ts         结果卡片渲染
-│       └── history.ts         历史(localStorage)
+│   ├── shared/                status(轻提示/进度)、url(链接判定)
+│   ├── scanner/               识别管线(engine/worker/decode/ingest/queue/results/history)
+│   ├── region/                屏幕选区(selection/crop 纯函数 + overlay 装配)
+│   └── generator/             生成(matrix/style/render-svg/render-canvas/export/scancheck/panel)
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
@@ -106,6 +103,24 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 - 选区坐标换算(CSS px → 图像 px,含 DPI 缩放)与选区状态机均为纯函数,独立单测。
 - 浏览器形态无 Tauri IPC:按钮隐藏;直接打开遮罩 URL 时降级为提示文案。
 
+## 4b. 生成管线(recognition-generation 分支)
+
+```
+文本 + 纠错等级
+  → generator/matrix.ts:QRCode.create → 矩阵 { size, data }
+  → generator/render-svg.ts:矩阵 + QrStyle → SVG 字符串(纯函数)
+      模块 path(方/圆角/圆点)· 三个定位角独立绘制(恒实心环)
+      渐变 userSpaceOnUse(整体渐变而非逐模块)· Logo 区域挖孔 + <image>
+  → 预览:inline SVG(矢量,任意缩放清晰)
+导出 PNG:SVG → Image → canvas(导出尺寸可调)→ toBlob
+导出 SVG:SVG 字符串直接 blob 下载
+可扫性自检:固定 320px 栅格化 → ImageData → decodePixels(复用识别引擎)→ 徽章
+```
+
+- 渲染器为纯函数(矩阵+样式 → SVG 字符串),不触碰 DOM,可完整单测。
+- 可扫性规则在渲染器内强制:定位角恒实心环、Logo 挖孔 + 尺寸上限、默认留白 4 模块。
+- Logo 仅接受 dataURL(用户本地文件),避免 SVG 栅格化时的跨域画布污染。
+
 ## 5. 前端模块职责
 
 | 模块 | 职责 |
@@ -115,6 +130,13 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 | region/selection.ts | 选区状态机(纯函数:归一化、最小尺寸判定) |
 | region/crop.ts | CSS 选区 → 图像像素区域(纯函数:DPI 缩放、四舍五入、夹紧) |
 | region/overlay.ts | 遮罩窗装配(canvas 绘制与指针事件,薄胶水层) |
+| generator/matrix.ts | 文本 → QR 矩阵(纯封装,溢出抛错) |
+| generator/style.ts | QrStyle 类型、默认样式与 5 个预设(纯) |
+| generator/render-svg.ts | 矩阵 + 样式 → SVG 字符串(纯函数,核心渲染器) |
+| generator/render-canvas.ts | SVG → canvas 栅格化(薄胶水) |
+| generator/export.ts | PNG/SVG 下载与复制(薄胶水) |
+| generator/scancheck.ts | 可扫性自检(复用 decodePixels) |
+| generator/panel.ts | 生成面板装配(表单 ↔ 状态 ↔ 预览) |
 | scanner/decode.ts | zxing-wasm 纯封装:PixelData → texts,可独立单测 |
 | scanner/engine.ts | Worker 生命周期与请求-响应封装;不可用时降级主线程解码 |
 | scanner/worker.ts | WASM 初始化 + 单张解码 |
@@ -151,6 +173,8 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 | 单元/组件 | Vitest + happy-dom | 历史去重/上限/清空、队列调度与错误隔离、URL 判定、结果卡片渲染、ingest 任务构建、状态提示 |
 | 识别管线 | Vitest(node 环境,`qrcode` 生成样张) | 正常 / 缩放模糊 / 低量化抖动 / 反色 样张解码断言 |
 | 选区数学 | Vitest | 选区状态机(归一化/最小尺寸)、CSS→图像坐标映射(DPI/夹紧) |
+| 生成渲染器 | Vitest | 各形状 path/渐变 defs/眼睛独立配色/Logo 挖孔/留白 viewBox 断言 |
+| 生成闭环 | Playwright E2E | 样式切换 → 导出 PNG → 回贴识别 Tab → 解码回读原文 |
 | E2E | Playwright(Chromium) | 三条输入路径、多码展示、失败标注、历史回显、**零网络请求断言** |
 
 **可测性设计约束**(编码时强制遵守):
@@ -171,3 +195,5 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 | @zxing/zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |
 | 屏幕选区多显示器/高分屏 DPI 差异 | v1 仅主显示器(原点屏),缩放按图像/视口比例换算;真机体验列入人工验证 |
+| 美化样式破坏可扫性 | 渲染器规则强制(实心眼环/挖孔/留白)+ 内置引擎实时试扫徽章 + E2E 闭环断言 |
+| SVG 栅格化画布污染 | Logo 仅接受 dataURL;全资源本地内联 |
