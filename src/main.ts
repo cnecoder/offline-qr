@@ -6,7 +6,7 @@ import { createSerialQueue } from './scanner/queue'
 import { renderResults, type ResultItem } from './scanner/results'
 import { createProgress, hideToast, showToast } from './shared/status'
 
-const dropzone = document.getElementById('dropzone') as HTMLElement
+const appRoot = document.getElementById('app') as HTMLElement
 const pickButton = document.getElementById('pick-button') as HTMLButtonElement
 const fileInput = document.getElementById('file-input') as HTMLInputElement
 const progressEl = document.getElementById('progress') as HTMLElement
@@ -125,19 +125,19 @@ fileInput.addEventListener('change', () => {
   fileInput.value = ''
 })
 
-// 输入路径 2:窗口级拖拽
+// 输入路径 2:窗口级拖拽(高亮整窗)
 for (const type of ['dragenter', 'dragover'] as const) {
   window.addEventListener(type, (event: DragEvent) => {
     event.preventDefault()
-    dropzone.classList.add('dragging')
+    appRoot.classList.add('dragging')
   })
 }
 window.addEventListener('dragleave', (event: DragEvent) => {
-  if (event.relatedTarget === null) dropzone.classList.remove('dragging')
+  if (event.relatedTarget === null) appRoot.classList.remove('dragging')
 })
 window.addEventListener('drop', (event: DragEvent) => {
   event.preventDefault()
-  dropzone.classList.remove('dragging')
+  appRoot.classList.remove('dragging')
   if (event.dataTransfer?.files.length) enqueueFiles(event.dataTransfer.files)
 })
 

@@ -7,35 +7,42 @@
     <title>二维码识别</title>
   </head>
   <body>
-    <div class="app">
+    <div class="app" id="app">
       <header class="header">
         <h1>二维码识别</h1>
-        <p class="subtitle">离线 · 本地运行</p>
+        <span class="subtitle">离线 · 本地运行</span>
       </header>
 
-      <section id="dropzone" class="dropzone" data-testid="dropzone">
-        <p class="drop-hint">拖拽图片到窗口任意位置</p>
-        <div class="drop-actions">
-          <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
-          <span class="hint">Ctrl+V 粘贴截图</span>
-        </div>
+      <section id="dropzone" class="toolbar" data-testid="dropzone">
+        <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
+        <span class="toolbar-hint">拖拽图片到窗口,或 Ctrl+V 粘贴截图</span>
         <input id="file-input" type="file" accept="image/*" multiple hidden />
       </section>
 
       <p id="progress" class="progress" data-testid="progress" hidden></p>
 
-      <section id="results" class="results" data-testid="results"></section>
-      <p id="empty-hint" class="empty-hint" data-testid="empty-hint">识别结果会显示在这里</p>
+      <main class="content">
+        <section id="results" class="results" data-testid="results"></section>
+        <div id="empty-hint" class="empty" data-testid="empty-hint">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <path d="M14 14h3.5v3.5H14zM18.5 18.5H21V21h-2.5z" fill="currentColor" stroke="none" />
+            <path d="M18.5 14H21v2.5M14 18.5h2.5V21" stroke-linecap="round" />
+          </svg>
+          <p class="empty-title">识别结果会显示在这里</p>
+          <p class="empty-sub">粘贴、拖拽或选择含二维码的图片</p>
+        </div>
+      </main>
 
       <section class="history">
-        <div class="history-head">
-          <button id="history-toggle" class="history-toggle" data-testid="history-toggle">最近识别</button>
+        <div class="history-bar">
+          <button id="history-toggle" class="history-toggle" data-testid="history-toggle" aria-expanded="false">最近识别(0)</button>
           <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
         </div>
         <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
       </section>
-
-      <footer class="footer">纯本地识别 · 不联网 · 不上传</footer>
     </div>
 
     <div id="toast" class="toast" data-testid="toast" hidden></div>
