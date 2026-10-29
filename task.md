@@ -42,7 +42,7 @@
 | 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、应用图标、可运行空壳;Vitest 测试基座(含首个示例测试) | ✔ 已完成(cargo check 通过;单文件产物 dist 仅 1 个 HTML) |
 | 2 | `feat: recognition engine` | decode/engine/worker 接入 zxing-wasm;qrcode 样张管线测试(正常/低分辨率/低量化/反色/多码/空图)+ 引擎封装测试 | ✔ 已完成(17 项测试全过;wasm 内联打包验证随 #3 接线进行) |
 | 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 串行队列;EXIF 方向、降采样、缩略图;ingest/queue 单元测试 | 待开始 |
-| 4 | `feat: results UI` | 结果卡片、复制/打开链接、多码展示、失败标注;渲染组件测试 | 待开始 |
+| 4 | `feat: results UI` | results/status 渲染模块 + main 装配(三条输入路径→队列→引擎→卡片);渲染组件测试;浏览器实测粘贴识别通过;wasm 以 data URI 内联进单文件产物 | ✔ 已完成(39 项测试;浏览器端到端:粘贴→识别→卡片渲染,截图确认) |
 | 5 | `feat: history` | 识别历史(去重置顶、上限 20、清空、回显);history 单元测试 | 待开始 |
 | 6 | `feat: theme polish` | 深浅色、轻提示、空态、视觉细节 | 待开始 |
 | 7 | `chore: desktop packaging` | NSIS 安装包构建通过 | 待开始 |
@@ -68,7 +68,7 @@
 ### Phase 2 · 识别核心
 - [x] 计划 #2:识别引擎(zxing-wasm)+ 样张管线测试
 - [ ] 计划 #3:输入路径与队列(ingest/queue 模块 + 单元测试)
-- [ ] 计划 #4:结果 UI 与 main 装配(含 wasm 内联打包验证)
+- [x] 计划 #4:结果 UI 与 main 装配(浏览器实测通过;wasm 内联打包验证通过;file:// 行为级验证放入 #8)
 - [ ] 计划 #5:识别历史
 
 ### Phase 3 · 桌面壳与打包
@@ -93,3 +93,4 @@
 - 2026-10-30 摄像头扫码移出路线图;验证顺序定为 Windows 先行;确立自动化测试策略(可测性内建,应测尽测)。
 - 2026-10-30 计划 #1 完成:Tauri 2 + Vite 骨架、图标、Vitest 基座;cargo check 通过;单文件产物验证 OK;识别引擎 npm 包名修正为 zxing-wasm。
 - 2026-10-30 计划 #2 完成:decode/engine/worker 三层管线;17 项自动化测试(含真实 wasm 解码样张:常规/中文/低分辨率/低量化/反色/一图多码/空图)。
+- 2026-10-30 计划 #3、#4 完成:ingest/queue/results/status 模块 + main 装配;39 项测试全过;浏览器实测粘贴识别链路成功(Worker + WASM + UI);单文件产物 1.31 MB,wasm 内联确认。
