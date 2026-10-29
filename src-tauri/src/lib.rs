@@ -20,7 +20,7 @@ fn capture_primary_screen() -> Result<CaptureData, String> {
     let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
     let screen = screens
         .iter()
-        .find(|s| s.x == 0 && s.y == 0)
+        .find(|s| s.display_info.x == 0 && s.display_info.y == 0)
         .or_else(|| screens.first())
         .ok_or("未找到可用显示器")?;
     let image = screen.capture().map_err(|e| e.to_string())?;
