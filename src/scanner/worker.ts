@@ -15,6 +15,9 @@ workerScope.onmessage = async (event: MessageEvent<DecodeRequest>) => {
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) throw new Error('无法创建离屏画布上下文')
+    // 透明像素对解码器等于纯黑,先垫白底再绘制
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, bitmap.width, bitmap.height)
     ctx.drawImage(bitmap, 0, 0)
     const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
     bitmap.close()

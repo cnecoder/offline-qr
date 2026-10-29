@@ -1,25 +1,10 @@
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
-import { qrPng, solidPng } from './helpers'
+import { expect, test } from '@playwright/test'
+import { pasteImage, qrPng, solidPng } from './helpers'
 
 const RESULT_TEXT = '[data-testid="result-text"]'
 const HISTORY_TOGGLE = /最近识别/
-
-/** 在页面内合成剪贴板粘贴事件(与真实 Ctrl+V 走同一处理路径) */
-async function pasteImage(page: Page, png: Buffer, name = 'shot.png'): Promise<void> {
-  await page.evaluate(
-    ({ base64, name }) => {
-      const bin = atob(base64)
-      const bytes = new Uint8Array(bin.length)
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-      const dt = new DataTransfer()
-      dt.items.add(new File([bytes], name, { type: 'image/png' }))
-      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }))
-    },
-    { base64: png.toString('base64'), name },
-  )
-}
 
 test.describe('二维码识别 · E2E(localhost)', () => {
   test.beforeEach(async ({ page }) => {

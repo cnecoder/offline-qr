@@ -13,37 +13,141 @@
         <span class="subtitle">离线 · 本地运行</span>
       </header>
 
-      <section id="dropzone" class="toolbar" data-testid="dropzone">
-        <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
-        <button id="region-button" data-testid="region-button" hidden>屏幕选区</button>
-        <span class="toolbar-hint">拖拽图片到窗口,或 Ctrl+V 粘贴截图</span>
-        <input id="file-input" type="file" accept="image/*" multiple hidden />
-      </section>
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="scan" aria-selected="true">识别</button>
+        <button class="tab" data-tab="generate" aria-selected="false">生成</button>
+      </nav>
 
-      <p id="progress" class="progress" data-testid="progress" hidden></p>
+      <!-- 识别面板 -->
+      <div id="panel-scan" class="panel" data-testid="panel-scan">
+        <section id="dropzone" class="toolbar" data-testid="dropzone">
+          <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
+          <button id="region-button" data-testid="region-button" hidden>屏幕选区</button>
+          <span class="toolbar-hint">拖拽图片到窗口,或 Ctrl+V 粘贴截图</span>
+          <input id="file-input" type="file" accept="image/*" multiple hidden />
+        </section>
 
-      <main class="content">
-        <section id="results" class="results" data-testid="results"></section>
-        <div id="empty-hint" class="empty" data-testid="empty-hint">
-          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-            <rect x="3" y="3" width="7" height="7" rx="1.5" />
-            <rect x="14" y="3" width="7" height="7" rx="1.5" />
-            <rect x="3" y="14" width="7" height="7" rx="1.5" />
-            <path d="M14 14h3.5v3.5H14zM18.5 18.5H21V21h-2.5z" fill="currentColor" stroke="none" />
-            <path d="M18.5 14H21v2.5M14 18.5h2.5V21" stroke-linecap="round" />
-          </svg>
-          <p class="empty-title">识别结果会显示在这里</p>
-          <p class="empty-sub">粘贴、拖拽或选择含二维码的图片</p>
+        <p id="progress" class="progress" data-testid="progress" hidden></p>
+
+        <main class="content">
+          <section id="results" class="results" data-testid="results"></section>
+          <div id="empty-hint" class="empty" data-testid="empty-hint">
+            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <path d="M14 14h3.5v3.5H14zM18.5 18.5H21V21h-2.5z" fill="currentColor" stroke="none" />
+              <path d="M18.5 14H21v2.5M14 18.5h2.5V21" stroke-linecap="round" />
+            </svg>
+            <p class="empty-title">识别结果会显示在这里</p>
+            <p class="empty-sub">粘贴、拖拽或选择含二维码的图片</p>
+          </div>
+        </main>
+
+        <section class="history">
+          <div class="history-bar">
+            <button id="history-toggle" class="history-toggle" data-testid="history-toggle" aria-expanded="false">最近识别(0)</button>
+            <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
+          </div>
+          <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
+        </section>
+      </div>
+
+      <!-- 生成面板 -->
+      <div id="panel-generate" class="panel" data-testid="panel-generate" hidden>
+        <div class="gen-layout">
+          <div class="gen-form">
+            <details open>
+              <summary>内容</summary>
+              <div class="field"><textarea id="gen-text" rows="3" placeholder="输入文本或网址"></textarea></div>
+              <label class="row">纠错等级
+                <select id="gen-ecc">
+                  <option value="L">L · 低(7%)</option>
+                  <option value="M" selected>M · 中(15%)</option>
+                  <option value="Q">Q · 较高(25%)</option>
+                  <option value="H">H · 高(30%)</option>
+                </select>
+              </label>
+            </details>
+            <details open>
+              <summary>样式</summary>
+              <label class="row">模块形状
+                <select id="gen-shape">
+                  <option value="square">方块</option>
+                  <option value="rounded">圆角</option>
+                  <option value="dot">圆点</option>
+                </select>
+              </label>
+              <label class="row">眼框形状
+                <select id="gen-eye-frame">
+                  <option value="square">方块</option>
+                  <option value="rounded">圆角</option>
+                  <option value="circle">圆形</option>
+                </select>
+              </label>
+              <label class="row">眼点形状
+                <select id="gen-eye-ball">
+                  <option value="square">方块</option>
+                  <option value="rounded">圆角</option>
+                  <option value="circle">圆形</option>
+                </select>
+              </label>
+              <div class="row2">
+                <label class="row">前景<input type="color" id="gen-fg" value="#000000" /></label>
+                <label class="row">眼框色<input type="color" id="gen-eye-frame-color" value="#000000" /></label>
+              </div>
+              <div class="row2">
+                <label class="row">眼点色<input type="color" id="gen-eye-ball-color" value="#000000" /></label>
+                <label class="row">背景<input type="color" id="gen-bg" value="#ffffff" /></label>
+              </div>
+              <label class="row check"><input type="checkbox" id="gen-bg-transparent" /> 透明背景</label>
+              <label class="row">渐变
+                <select id="gen-gradient">
+                  <option value="none">无</option>
+                  <option value="linear">线性</option>
+                  <option value="radial">径向</option>
+                </select>
+              </label>
+              <div class="row2" id="gen-gradient-extra" hidden>
+                <label class="row">第二色<input type="color" id="gen-fg2" value="#000000" /></label>
+                <label class="row">角度<input type="range" id="gen-rot" min="0" max="360" step="15" value="45" /></label>
+              </div>
+              <label class="row">留白 <input type="range" id="gen-margin" min="0" max="8" value="4" /> <b id="gen-margin-val">4</b> 模块</label>
+            </details>
+            <details>
+              <summary>Logo</summary>
+              <div class="row2 logo-row">
+                <label class="file-mini">选择图片<input type="file" id="gen-logo-file" accept="image/*" hidden /></label>
+                <img id="gen-logo-thumb" class="logo-thumb" hidden alt="Logo 预览" />
+                <button type="button" id="gen-logo-remove" class="link-button" hidden>移除</button>
+              </div>
+              <label class="row">大小 <input type="range" id="gen-logo-size" min="15" max="30" value="22" /> <b id="gen-logo-size-val">22</b>%</label>
+              <label class="row">形状
+                <select id="gen-logo-shape">
+                  <option value="square">方形</option>
+                  <option value="circle">圆形</option>
+                </select>
+              </label>
+            </details>
+            <details open>
+              <summary>导出</summary>
+              <label class="row">PNG 尺寸 <input type="range" id="gen-export-size" min="256" max="2048" step="64" value="512" /> <b id="gen-export-size-val">512</b>px</label>
+            </details>
+            <div class="presets" id="gen-presets"></div>
+          </div>
+
+          <div class="gen-preview">
+            <div id="gen-preview" class="preview-box" data-testid="gen-preview"></div>
+            <p id="gen-scan-badge" class="scan-badge" data-testid="scan-badge" hidden></p>
+            <div class="gen-actions">
+              <button id="gen-png" class="primary" disabled>保存 PNG</button>
+              <button id="gen-svg" disabled>保存 SVG</button>
+              <button id="gen-copy" disabled>复制图片</button>
+            </div>
+            <p id="gen-status" class="status"></p>
+          </div>
         </div>
-      </main>
-
-      <section class="history">
-        <div class="history-bar">
-          <button id="history-toggle" class="history-toggle" data-testid="history-toggle" aria-expanded="false">最近识别(0)</button>
-          <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
-        </div>
-        <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
-      </section>
+      </div>
     </div>
 
     <div id="toast" class="toast" data-testid="toast" hidden></div>

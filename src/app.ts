@@ -1,11 +1,29 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { initGeneratePanel } from './generator/panel'
 import { createEngine } from './scanner/engine'
 import { createHistoryStore } from './scanner/history'
 import { createIngest, isImageFile } from './scanner/ingest'
 import { createSerialQueue } from './scanner/queue'
 import { renderResults, type ResultItem } from './scanner/results'
 import { createProgress, hideToast, showToast } from './shared/status'
+
+// 双 Tab:识别 | 生成
+const tabButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.tab[data-tab]'))
+function switchTab(name: string): void {
+  for (const button of tabButtons) {
+    const active = button.dataset.tab === name
+    button.classList.toggle('active', active)
+    button.setAttribute('aria-selected', String(active))
+  }
+  ;(document.getElementById('panel-scan') as HTMLElement).hidden = name !== 'scan'
+  ;(document.getElementById('panel-generate') as HTMLElement).hidden = name !== 'generate'
+}
+for (const button of tabButtons) {
+  button.addEventListener('click', () => switchTab(button.dataset.tab ?? 'scan'))
+}
+switchTab('scan')
+initGeneratePanel()
 
 const appRoot = document.getElementById('app') as HTMLElement
 const pickButton = document.getElementById('pick-button') as HTMLButtonElement
