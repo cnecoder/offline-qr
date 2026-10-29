@@ -59,6 +59,12 @@
 - `main`:基线冻结点,作为两条线的共同祖先与合流参考
 - 约定:在任一分支工作时,以该分支上的 task.md 为准继续同步进度;commit 纪律与工作约定不变
 
+## CI / CD(待远程仓库创建后验证)
+
+- `.github/workflows/ci.yml`:push / PR(main、recognition、recognition-generation)→ 单测 + 构建 + E2E(ubuntu,前端不需要 Rust)
+- `.github/workflows/release.yml`:推送 `v*` tag → 三平台矩阵构建(Windows NSIS / Linux AppImage+deb / macOS dmg)→ tauri-action 自动创建 Release;含 tag↔version 一致性守卫
+- 已同步到两条迭代分支(recognition 分支 cherry-pick);创建远程后 `git push origin main v1.0.0 recognition recognition-generation` 即触发验证
+
 ## 阶段与任务
 
 ### Phase 0 · 需求与设计
@@ -110,3 +116,4 @@
 - 2026-10-30 UI 重设计(v1.1):紧凑小窗口(720×540)密度优先布局——一行式输入条、主内容区充满并内部滚动、历史上浮面板、移除页脚;46 单测 + 9 E2E 回归全过;安装包重打同步新界面。
 - 2026-10-30 计划 #9 屏幕选区识别完成:FR-7 落地(Rust 截屏 + 遮罩选区 + 管线复用),选区数学纯函数单测;56 单测 + 9 E2E 全绿;真机截屏体验待人工验证。
 - 2026-10-30 版本升至 **v1.0.0** 并打 tag;建立双迭代分支:`recognition`(仅识别)与 `recognition-generation`(识别+生成),main 冻结为基线参考。
+- 2026-10-30 配置 GitHub Actions:CI(push/PR 测试)与 Release(tag → 三平台产物)两套工作流;待远程仓库创建后验证。
