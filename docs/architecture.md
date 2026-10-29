@@ -81,7 +81,7 @@ File / Blob
   → 主线程:结果卡片 / 历史
 ```
 
-- **解码在 Web Worker**:WASM 模块在 worker 内初始化一次并复用,主线程只做 UI,满足"批量不卡界面"。
+- **解码在 Web Worker**:Worker 以 `?worker&inline` 引入(构建期 base64 内联进产物,从设计上规避单文件模式下的分包问题);WASM 模块在 worker 内初始化一次并复用,主线程只做 UI,满足"批量不卡界面"。
 - 输入统一抽象为 `ImageTask { id, bitmap, thumb }`,**队列串行**处理;单张失败不阻断队列。
 - 解码参数固定开启 tryHarder / tryRotate / tryInvert / tryDownscale,以识别率为优先(延迟换准确)。
 
@@ -114,19 +114,32 @@ File / Blob
 
 - Tauri conf:`frontendDist: ../dist`;CSP 仅本地源并允许 `wasm-unsafe-eval`;窗口规格见 UI 文档 §5。
 - 形态差异:桌面版窗口即应用;单文件版 file:// 直开。
-- **已知风险(Phase 1 优先验证)**:① singlefile 对 Worker 的内联能力;② file:// 下 WASM 实例化。降级预案:解码回退主线程串行分批;WASM 走非 streaming 实例化;若 file:// 仍受限,单文件版注明需 localhost 访问,桌面版不受影响。
+- **已知风险(随 #2 首次接入引擎时验证)**:file:// 下 WASM 实例化(Worker 内联已通过 `?worker&inline` 从设计上规避)。降级预案:WASM 走非 streaming 实例化;若 file:// 仍受限,单文件版注明需 localhost 访问,桌面版不受影响。
 
-## 8. 测试策略
+## 8. 测试策略(自动化优先)
 
-- **smoke(node)**:`qrcode` 生成矩阵 → 手写 RGBA(含 4 模块留白)→ 三种扰动(原样 / 缩放模糊 / 低量化抖动)→ @zxing/wasm 解码断言文本一致。
-- **浏览器 E2E**:合成 paste 事件注入图片文件,验证粘贴路径、结果渲染、多码展示;DevTools Network 面板验证零请求。
-- **手工验收**:按需求文档 §7 验收清单执行。
+原则:**应测尽测、可测性内建**;人工测试仅保留安装卸载等不可自动化项。
+
+| 层 | 工具 | 覆盖内容 |
+|---|---|---|
+| 单元/组件 | Vitest + happy-dom | 历史去重/上限/清空、队列调度与错误隔离、URL 判定、结果卡片渲染、ingest 任务构建、状态提示 |
+| 识别管线 | Vitest(node 环境,`qrcode` 生成样张) | 正常 / 缩放模糊 / 低量化抖动 / 反色 样张解码断言 |
+| E2E | Playwright(Chromium) | 三条输入路径、多码展示、失败标注、历史回显、**零网络请求断言** |
+
+**可测性设计约束**(编码时强制遵守):
+
+1. 逻辑与 DOM 分离:历史、队列、URL 判定等均为纯函数/纯类
+2. 副作用集中且可注入:localStorage、当前时间、计时器通过参数注入,测试可替换
+3. 渲染函数式:`render(container, data)`,不依赖全局单例
+4. 引擎单一边界:所有解码必经 `engine.ts`,mock 点唯一
+5. DOM 断言使用 `data-testid`,禁止用样式/文案定位
+
+覆盖率门禁:`vitest --coverage`,src 全局阈值 ≥ 80%(装配层 main.ts 与 worker.ts 除外)。
 
 ## 9. 风险与对策
 
 | 风险 | 对策 |
 |---|---|
-| singlefile 内联 Worker 失败 | worker format=iife;或降级主线程解码(串行分批) |
-| file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用 |
+| file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用(Worker 内联风险已由 `?worker&inline` 从设计上规避) |
 | @zxing/wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |

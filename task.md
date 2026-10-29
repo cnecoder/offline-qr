@@ -25,6 +25,8 @@
 | 2026-10-30 | 识别引擎 | @zxing/wasm(识别率优先,支持一图多码;jsQR 弃用,qrcode 库仅作测试依赖) |
 | 2026-10-30 | 批量与解析 | 支持多张批量识别;智能解析 v1 仅 URL + 纯文本 |
 | 2026-10-30 | 平台修正 | 仅桌面端:Windows / Linux / macOS;不考虑 iOS 等移动端 |
+| 2026-10-30 | 范围修正 | **摄像头扫码移出路线图(不做)**;全部功能先在 Windows 验证与打磨,完成后才适配 Linux/macOS |
+| 2026-10-30 | 测试策略 | **自动化优先**:Vitest + happy-dom 单元/组件测试、qrcode 样张管线测试、Playwright E2E;覆盖率门禁 ≥80%;可测性设计约束见架构文档 §8 |
 
 ## 工作约定(每个会话必须遵守)
 
@@ -37,11 +39,11 @@
 
 | # | commit | 内容 | 状态 |
 |---|---|---|---|
-| 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、图标、空窗口可跑;**验证两个架构风险**(singlefile×Worker 内联、file:// WASM) | 待开始 |
-| 2 | `feat: recognition engine` | engine/worker 接入 @zxing/wasm;smoke 测试跑通 | 待开始 |
-| 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 队列;EXIF 方向、降采样、缩略图 | 待开始 |
-| 4 | `feat: results UI` | 结果卡片、复制/打开链接、多码展示、失败标注 | 待开始 |
-| 5 | `feat: history` | 识别历史(去重置顶、上限 20、清空、回显) | 待开始 |
+| 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、应用图标、可运行空壳;Vitest 测试基座(含首个示例测试) | 进行中 |
+| 2 | `feat: recognition engine` | decode/engine/worker 接入 @zxing/wasm;qrcode 样张管线测试(正常/模糊/低量化/反色)+ file:// WASM 风险验证 | 待开始 |
+| 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 串行队列;EXIF 方向、降采样、缩略图;ingest/queue 单元测试 | 待开始 |
+| 4 | `feat: results UI` | 结果卡片、复制/打开链接、多码展示、失败标注;渲染组件测试 | 待开始 |
+| 5 | `feat: history` | 识别历史(去重置顶、上限 20、清空、回显);history 单元测试 | 待开始 |
 | 6 | `feat: theme polish` | 深浅色、轻提示、空态、视觉细节 | 待开始 |
 | 7 | `chore: desktop packaging` | NSIS 安装包构建通过 | 待开始 |
 | 8 | `test: e2e verification` | 浏览器 E2E + 需求 §7 验收清单核对 | 待开始 |
@@ -79,7 +81,6 @@
 ### 后期(不在 v1 范围)
 - [ ] 生成模块:文本生成、参数调节、保存 PNG/复制
 - [ ] 生成增强:配色自定义、导出 SVG、生成历史、Wi-Fi/vCard 模板
-- [ ] 摄像头实时扫码(桌面先行;Linux WebKitGTK 兼容性另行评估)
 - [ ] Linux 适配
 - [ ] macOS 适配(构建需 macOS 环境或 CI macOS runner)
 
@@ -89,3 +90,4 @@
 - 2026-10-30 v1 范围定向:识别优先、生成与摄像头后置。
 - 2026-10-30 关键决策定稿(@zxing/wasm、多张批量、URL+文本);需求/架构/UI 三份文档 v1.0 定稿;开发计划确定。
 - 2026-10-30 平台修正:目标平台收敛为桌面三端(Windows/Linux/macOS),移除 iOS。
+- 2026-10-30 摄像头扫码移出路线图;验证顺序定为 Windows 先行;确立自动化测试策略(可测性内建,应测尽测)。

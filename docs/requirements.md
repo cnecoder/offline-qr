@@ -69,9 +69,11 @@
 ## 6. 后期路线(粗粒度,逐期再细化)
 
 1. 生成模块:文本生成 → 参数(纠错/尺寸/留白)→ 配色自定义、SVG 导出 → Wi-Fi/vCard 模板、生成历史
-2. 摄像头实时扫码(桌面先行;Linux WebKitGTK 兼容性另行评估)
-3. Linux 适配(注意:WebKitGTK 摄像头兼容性较弱)
-4. macOS 适配(构建需 macOS 环境或 CI macOS runner)
+2. Linux 适配
+3. macOS 适配(构建需 macOS 环境或 CI macOS runner)
+
+> 平台节奏:全部功能先在 Windows 上验证与打磨,打磨完成后才进行 Linux / macOS 适配。
+> 摄像头扫码:已从路线图移除,不做。
 
 ## 7. 验收清单(v1)
 
