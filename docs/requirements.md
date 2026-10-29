@@ -15,7 +15,7 @@
 | 项 | 结论 |
 |---|---|
 | 开发/首发平台 | Windows 10/11 |
-| 后期平台 | Linux、iOS(架构保留三端通用) |
+| 后期平台 | Linux、macOS(架构保留桌面三端通用;不考虑 iOS 等移动端) |
 | 形态 A(主) | Tauri 2 桌面应用,NSIS 安装包 |
 | 形态 B | 纯网页单文件 `dist/index.html`(file:// 直开或任意静态服务) |
 
@@ -70,8 +70,8 @@
 
 1. 生成模块:文本生成 → 参数(纠错/尺寸/留白)→ 配色自定义、SVG 导出 → Wi-Fi/vCard 模板、生成历史
 2. 摄像头实时扫码(桌面先行;Linux WebKitGTK 兼容性另行评估)
-3. Linux 适配
-4. iOS 适配(需 macOS + Xcode,摄像头权限 Info.plist)
+3. Linux 适配(注意:WebKitGTK 摄像头兼容性较弱)
+4. macOS 适配(构建需 macOS 环境或 CI macOS runner)
 
 ## 7. 验收清单(v1)
 
