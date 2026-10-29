@@ -1,5 +1,6 @@
 import './styles/style.css'
 import { createEngine } from './scanner/engine'
+import { createHistoryStore } from './scanner/history'
 import { createIngest, isImageFile } from './scanner/ingest'
 import { createSerialQueue } from './scanner/queue'
 import { renderResults, type ResultItem } from './scanner/results'
@@ -12,11 +13,15 @@ const progressEl = document.getElementById('progress') as HTMLElement
 const resultsEl = document.getElementById('results') as HTMLElement
 const emptyHint = document.getElementById('empty-hint') as HTMLElement
 const toastEl = document.getElementById('toast') as HTMLElement
+const historyToggle = document.getElementById('history-toggle') as HTMLButtonElement
+const historyClear = document.getElementById('history-clear') as HTMLButtonElement
+const historyList = document.getElementById('history-list') as HTMLUListElement
 
 const engine = createEngine()
 const ingest = createIngest()
 const queue = createSerialQueue()
 const progress = createProgress(progressEl)
+const history = createHistoryStore({ storage: localStorage })
 
 const items: ResultItem[] = []
 let uidCounter = 0
@@ -85,6 +90,10 @@ async function decodeItem(uid: string, file: File): Promise<void> {
       target.state = texts.length > 0 ? 'done' : 'failed'
       target.texts = texts
     }
+    if (texts.length > 0) {
+      for (const text of texts) history.add(text)
+      renderHistory()
+    }
   } catch {
     const target = findItem(uid)
     if (target) target.state = 'failed'
@@ -147,3 +156,61 @@ document.addEventListener('paste', (event: ClipboardEvent) => {
     enqueueFiles(files)
   }
 })
+
+// 识别历史:折叠面板 + 点击回显
+let historyOpen = false
+let recallCounter = 0
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+function formatTime(ts: number): string {
+  const d = new Date(ts)
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function renderHistory(): void {
+  const entries = history.all()
+  historyToggle.textContent = `最近识别(${entries.length})`
+  historyToggle.setAttribute('aria-expanded', String(historyOpen))
+  historyClear.hidden = entries.length === 0
+  historyList.hidden = !historyOpen || entries.length === 0
+  historyList.replaceChildren()
+  for (const entry of entries) {
+    const li = document.createElement('li')
+    li.dataset.testid = 'history-item'
+    li.title = entry.text
+    const text = document.createElement('span')
+    text.className = 'history-text'
+    text.textContent = entry.text
+    const time = document.createElement('span')
+    time.className = 'history-time'
+    time.textContent = formatTime(entry.at)
+    li.append(text, time)
+    li.addEventListener('click', () => recallEntry(entry.text))
+    historyList.append(li)
+  }
+}
+
+function recallEntry(text: string): void {
+  items.unshift({
+    id: `recall-${++recallCounter}`,
+    name: '历史记录',
+    thumb: '',
+    state: 'done',
+    texts: [text],
+  })
+  refresh()
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+
+historyToggle.addEventListener('click', () => {
+  historyOpen = !historyOpen
+  renderHistory()
+})
+historyClear.addEventListener('click', () => {
+  if (window.confirm('确定清空全部识别历史?')) {
+    history.clear()
+    renderHistory()
+  }
+})
+
+renderHistory()
