@@ -1,0 +1,132 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1f2328;
+  --muted: #6b7280;
+  --accent: #4f46e5;
+  --accent-weak: #eef2ff;
+  --border: #e2e4e9;
+  --danger: #dc2626;
+  --shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417;
+    --card: #1b1e23;
+    --text: #e6e8eb;
+    --muted: #9aa1ab;
+    --accent: #818cf8;
+    --accent-weak: #262a3d;
+    --border: #2c3038;
+    --danger: #f87171;
+    --shadow: 0 1px 3px rgb(0 0 0 / 40%);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.app { max-width: 720px; margin: 0 auto; padding: 28px 20px 40px; }
+
+/* 顶栏 */
+.header { display: flex; align-items: baseline; justify-content: space-between; }
+.header h1 { margin: 0; font-size: 20px; }
+.subtitle { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+/* 输入区 */
+.dropzone {
+  margin-top: 18px;
+  padding: 26px 16px;
+  border: 1.5px dashed var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  text-align: center;
+}
+.dropzone.dragging { border-color: var(--accent); background: var(--accent-weak); }
+.drop-hint { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+.drop-actions { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.hint { color: var(--muted); font-size: 12.5px; }
+
+/* 按钮 */
+button {
+  padding: 9px 16px; border: 1px solid var(--border); border-radius: 9px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary:hover { opacity: 0.92; color: #fff; }
+.link-button {
+  border: none; background: none; padding: 0;
+  color: var(--accent); font-size: 13px; cursor: pointer; text-decoration: underline;
+}
+
+/* 进度与状态 */
+.progress { margin: 12px 2px 0; color: var(--accent); font-size: 13px; }
+
+/* 结果卡片 */
+.results { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.result-card {
+  display: flex; gap: 12px; padding: 12px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+.result-card.fail { opacity: 0.75; }
+.thumb {
+  width: 64px; height: 64px; border-radius: 8px; object-fit: cover;
+  background: var(--bg); flex-shrink: 0;
+}
+.card-body { flex: 1; min-width: 0; }
+.result-text {
+  margin: 0; font-family: ui-monospace, Consolas, monospace; font-size: 13.5px;
+  word-break: break-all; white-space: pre-wrap;
+}
+.result-text.collapsed {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; cursor: pointer;
+}
+.card-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.card-actions button { padding: 4px 10px; font-size: 12.5px; border-radius: 7px; }
+.card-actions a {
+  padding: 4px 10px; font-size: 12.5px; border-radius: 7px;
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  text-decoration: none; display: inline-block;
+}
+.card-actions a:hover { border-color: var(--accent); color: var(--accent); }
+.card-msg { margin: 0; color: var(--muted); font-size: 13px; }
+
+.empty-hint { margin: 14px 2px 0; color: var(--muted); font-size: 13px; }
+
+/* 历史 */
+.history { margin-top: 22px; }
+.history-head { display: flex; justify-content: space-between; align-items: center; }
+.history-toggle {
+  border: none; background: none; padding: 0;
+  color: var(--muted); font-size: 13px; cursor: pointer;
+}
+.history-toggle:hover { color: var(--accent); }
+.history-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.history-list li {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 8px 2px; border-top: 1px solid var(--border);
+  font-size: 13px; cursor: pointer;
+}
+.history-list li:hover .history-text { color: var(--accent); }
+.history-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-time { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+/* 轻提示 */
+.toast {
+  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+  padding: 8px 18px; background: var(--text); color: var(--bg);
+  border-radius: 999px; font-size: 13px; pointer-events: none;
+}
+
+.footer { margin-top: 28px; text-align: center; color: var(--muted); font-size: 12px; }

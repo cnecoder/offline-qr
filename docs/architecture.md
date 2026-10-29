@@ -27,7 +27,7 @@ v1 无任何 Rust 业务逻辑:Rust 壳只负责窗口与打包;识别、历史�
 |---|---|---|
 | UI | 原生 TypeScript + DOM(项目规模不需要框架;后期复杂化再评估) | — |
 | 构建 | Vite + TypeScript | MIT |
-| 识别引擎 | @zxing/wasm(ZXing-C++ 官方 WASM 构建) | Apache-2.0 |
+| 识别引擎 | zxing-wasm(ZXing-C++ 官方 WASM 构建,npm 包名不带 scope) | Apache-2.0 |
 | 桌面壳 | Tauri 2(窗口/打包) | MIT / Apache-2.0 |
 | 单文件产物 | vite-plugin-singlefile | MIT |
 | 测试辅助 | qrcode(仅 devDep,为 smoke 测试生成样张) | MIT |
@@ -90,6 +90,7 @@ File / Blob
 | 模块 | 职责 |
 |---|---|
 | main.ts | 装配:三种输入监听 → ingest → 队列 → 渲染 |
+| scanner/decode.ts | zxing-wasm 纯封装:PixelData → texts,可独立单测 |
 | scanner/engine.ts | Worker 生命周期与请求-响应封装;不可用时降级主线程解码 |
 | scanner/worker.ts | WASM 初始化 + 单张解码 |
 | scanner/ingest.ts | File/Blob → ImageBitmap(EXIF 方向)+ 64px 缩略图 |
@@ -141,5 +142,5 @@ File / Blob
 | 风险 | 对策 |
 |---|---|
 | file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用(Worker 内联风险已由 `?worker&inline` 从设计上规避) |
-| @zxing/wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
+| zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |

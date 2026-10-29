@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%234f46e5'/><rect x='18' y='18' width='26' height='26' rx='4' fill='white'/><rect x='56' y='18' width='26' height='26' rx='4' fill='white'/><rect x='18' y='56' width='26' height='26' rx='4' fill='white'/><rect x='58' y='58' width='10' height='10' fill='white'/><rect x='72' y='72' width='10' height='10' fill='white'/></svg>" />
+    <title>二维码识别</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <h1>二维码识别</h1>
+        <p class="subtitle">离线 · 本地运行</p>
+      </header>
+
+      <section id="dropzone" class="dropzone" data-testid="dropzone">
+        <p class="drop-hint">拖拽图片到窗口任意位置</p>
+        <div class="drop-actions">
+          <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
+          <span class="hint">Ctrl+V 粘贴截图</span>
+        </div>
+        <input id="file-input" type="file" accept="image/*" multiple hidden />
+      </section>
+
+      <p id="progress" class="progress" data-testid="progress" hidden></p>
+
+      <section id="results" class="results" data-testid="results"></section>
+      <p id="empty-hint" class="empty-hint" data-testid="empty-hint">识别结果会显示在这里</p>
+
+      <section class="history">
+        <div class="history-head">
+          <button id="history-toggle" class="history-toggle" data-testid="history-toggle">最近识别</button>
+          <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
+        </div>
+        <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
+      </section>
+
+      <footer class="footer">纯本地识别 · 不联网 · 不上传</footer>
+    </div>
+
+    <div id="toast" class="toast" data-testid="toast" hidden></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

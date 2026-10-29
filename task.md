@@ -22,7 +22,7 @@
 | 2026-10-30 | 技术栈 | Tauri 2(Rust 壳,零业务代码)+ Vite + TypeScript;构建产物同时含单文件 HTML |
 | 2026-10-30 | 开发流程 | git 管理;每个特性/修复独立 commit;task.md 跟踪进度;文档与实现保持一致 |
 | 2026-10-30 | **v1 范围** | **只做二维码识别(图片:选文件/拖拽/Ctrl+V 粘贴),识别体验做到最好;摄像头扫码与生成模块(配色/SVG/生成历史/Wi-Fi 模板)全部后期** |
-| 2026-10-30 | 识别引擎 | @zxing/wasm(识别率优先,支持一图多码;jsQR 弃用,qrcode 库仅作测试依赖) |
+| 2026-10-30 | 识别引擎 | zxing-wasm(识别率优先,支持一图多码;jsQR 弃用,qrcode 库仅作测试依赖) |
 | 2026-10-30 | 批量与解析 | 支持多张批量识别;智能解析 v1 仅 URL + 纯文本 |
 | 2026-10-30 | 平台修正 | 仅桌面端:Windows / Linux / macOS;不考虑 iOS 等移动端 |
 | 2026-10-30 | 范围修正 | **摄像头扫码移出路线图(不做)**;全部功能先在 Windows 验证与打磨,完成后才适配 Linux/macOS |
@@ -39,8 +39,8 @@
 
 | # | commit | 内容 | 状态 |
 |---|---|---|---|
-| 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、应用图标、可运行空壳;Vitest 测试基座(含首个示例测试) | 进行中 |
-| 2 | `feat: recognition engine` | decode/engine/worker 接入 @zxing/wasm;qrcode 样张管线测试(正常/模糊/低量化/反色)+ file:// WASM 风险验证 | 待开始 |
+| 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、应用图标、可运行空壳;Vitest 测试基座(含首个示例测试) | ✔ 已完成(cargo check 通过;单文件产物 dist 仅 1 个 HTML) |
+| 2 | `feat: recognition engine` | decode/engine/worker 接入 zxing-wasm;qrcode 样张管线测试(正常/模糊/低量化/反色)+ file:// WASM 风险验证 | 待开始 |
 | 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 串行队列;EXIF 方向、降采样、缩略图;ingest/queue 单元测试 | 待开始 |
 | 4 | `feat: results UI` | 结果卡片、复制/打开链接、多码展示、失败标注;渲染组件测试 | 待开始 |
 | 5 | `feat: history` | 识别历史(去重置顶、上限 20、清空、回显);history 单元测试 | 待开始 |
@@ -63,7 +63,7 @@
 
 ### Phase 1 · 项目骨架
 - [x] git 仓库初始化
-- [ ] 计划 #1:骨架 + 架构风险验证
+- [x] 计划 #1:骨架 + Vitest 测试基座(单文件构建通过、6 项单测通过、cargo check 通过)
 
 ### Phase 2 · 识别核心
 - [ ] 计划 #2:识别引擎 + smoke
@@ -91,3 +91,4 @@
 - 2026-10-30 关键决策定稿(@zxing/wasm、多张批量、URL+文本);需求/架构/UI 三份文档 v1.0 定稿;开发计划确定。
 - 2026-10-30 平台修正:目标平台收敛为桌面三端(Windows/Linux/macOS),移除 iOS。
 - 2026-10-30 摄像头扫码移出路线图;验证顺序定为 Windows 先行;确立自动化测试策略(可测性内建,应测尽测)。
+- 2026-10-30 计划 #1 完成:Tauri 2 + Vite 骨架、图标、Vitest 基座;cargo check 通过;单文件产物验证 OK;识别引擎 npm 包名修正为 zxing-wasm。
