@@ -45,6 +45,13 @@ npm run e2e # 9 项端到端测试(Playwright,含 file:// 直开与零网络请�
 | [docs/ui-design.md](docs/ui-design.md) | 布局、组件规格、视觉、窗口规格 |
 | [task.md](task.md) | 任务跟踪与进度(唯一入口) |
 
+## CI / 发布(GitHub Actions)
+
+- `.github/workflows/ci.yml` —— push / PR(main、recognition、recognition-generation)自动执行:单元测试 → 构建 → Playwright E2E
+- `.github/workflows/release.yml` —— 推送 `v*` tag 自动构建三平台产物并创建 GitHub Release:Windows(NSIS)/ Linux(AppImage、deb)/ macOS(dmg,Apple Silicon)
+- 约定:tag 必须与 `src-tauri/tauri.conf.json` 的 `version` 一致(工作流内强制校验);发布流程 = 改版本号 → commit → `git tag v1.x.0` → push tag
+- 创建远程仓库并推送后即生效,无需额外 Secrets(Release 使用内置 `GITHUB_TOKEN`)
+
 ## 技术栈
 
 Tauri 2(Rust 壳,零业务代码)· Vite + TypeScript · zxing-wasm(Apache-2.0)· Vitest · Playwright

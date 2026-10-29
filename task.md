@@ -60,6 +60,12 @@
 - `main`:基线冻结点,作为两条线的共同祖先与合流参考
 - 约定:在任一分支工作时,以该分支上的 task.md 为准继续同步进度;commit 纪律与工作约定不变
 
+## CI / CD(待远程仓库创建后验证)
+
+- `.github/workflows/ci.yml`:push / PR(main、recognition、recognition-generation)→ 单测 + 构建 + E2E(ubuntu,前端不需要 Rust)
+- `.github/workflows/release.yml`:推送 `v*` tag → 三平台矩阵构建(Windows NSIS / Linux AppImage+deb / macOS dmg)→ tauri-action 自动创建 Release;含 tag↔version 一致性守卫
+- 已同步到两条迭代分支(recognition 分支 cherry-pick);创建远程后 `git push origin main v1.0.0 recognition recognition-generation` 即触发验证
+
 ## 阶段与任务
 
 ### Phase 0 · 需求与设计
@@ -115,3 +121,4 @@
 - 2026-10-30 计划 #9 屏幕选区识别完成:FR-7 落地(Rust 截屏 + 遮罩选区 + 管线复用),选区数学纯函数单测;56 单测 + 9 E2E 全绿;真机截屏体验待人工验证。
 - 2026-10-30 版本升至 **v1.0.0** 并打 tag;建立双迭代分支:`recognition`(仅识别)与 `recognition-generation`(识别+生成),main 冻结为基线参考。
 - 2026-10-30 计划 #10 生成第一批完成:双 Tab + 自研 SVG 渲染器(形状/渐变/眼睛配色/Logo 挖孔/透明底/5 预设)+ 可扫性自检 + 导出闭环;过程中修复"透明像素等同纯黑"(检测与识别路径垫白底)与"Logo 需 H 级纠错"(自动升级);69 单测 + 17 E2E 全绿。下一批:内容模板与生成历史。
+- 2026-10-30 配置 GitHub Actions:CI(push/PR 测试)与 Release(tag → 三平台产物)两套工作流,同步至两条迭代分支;待远程仓库创建后验证。
