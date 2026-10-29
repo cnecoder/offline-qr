@@ -28,7 +28,9 @@ v1 无任何 Rust 业务逻辑:Rust 壳只负责窗口与打包;识别、历史�
 | UI | 原生 TypeScript + DOM(项目规模不需要框架;后期复杂化再评估) | — |
 | 构建 | Vite + TypeScript | MIT |
 | 识别引擎 | zxing-wasm(ZXing-C++ 官方 WASM 构建,npm 包名不带 scope) | Apache-2.0 |
-| 桌面壳 | Tauri 2(窗口/打包) | MIT / Apache-2.0 |
+| 桌面壳 | Tauri 2(窗口/打包/截屏命令) | MIT / Apache-2.0 |
+| Rust 侧依赖 | screenshots(截屏)、image(png 编码)、base64 | MIT / Apache-2.0 |
+| 前端 Tauri API | @tauri-apps/api(invoke/event/window) | MIT/APACHE-2.0 |
 | 单文件产物 | vite-plugin-singlefile | MIT |
 | 测试辅助 | qrcode(仅 devDep,为 smoke 测试生成样张) | MIT |
 
@@ -85,11 +87,34 @@ File / Blob
 - 输入统一抽象为 `ImageTask { id, bitmap, thumb }`,**队列串行**处理;单张失败不阻断队列。
 - 解码参数固定开启 tryHarder / tryRotate / tryInvert / tryDownscale,以识别率为优先(延迟换准确)。
 
+## 4a. 屏幕选区管线(桌面版专属)
+
+```
+主窗 [屏幕选区] 按钮(仅 __TAURI_INTERNALS__ 存在时显示)
+  → invoke start_capture
+      Rust: screenshots 截取主显示器 → PNG → base64 存入 Mutex<State>
+      Rust: 创建全屏无边框置顶遮罩窗口 region-overlay(加载同一前端)
+遮罩窗(main.ts 按窗口 label 进入 overlay 模式)
+  → invoke get_capture → 全屏显示截图 + 十字光标 + 暗化
+  → 拖拽出矩形(选区状态机,纯函数)
+  → 松手:canvas 按图像像素裁剪 → toDataURL → invoke finish_capture(pngBase64)
+  → Esc:invoke cancel_capture
+Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase64)
+主窗 listen("region-captured") → base64 → File → 复用 enqueueFiles 识别管线
+```
+
+- 选区坐标换算(CSS px → 图像 px,含 DPI 缩放)与选区状态机均为纯函数,独立单测。
+- 浏览器形态无 Tauri IPC:按钮隐藏;直接打开遮罩 URL 时降级为提示文案。
+
 ## 5. 前端模块职责
 
 | 模块 | 职责 |
 |---|---|
-| main.ts | 装配:三种输入监听 → ingest → 队列 → 渲染 |
+| main.ts | 入口分发:按窗口 label/查询参数进入主窗或遮罩窗模式 |
+| app.ts | 主窗装配:三种输入监听 → ingest → 队列 → 渲染 + region 事件接入 |
+| region/selection.ts | 选区状态机(纯函数:归一化、最小尺寸判定) |
+| region/crop.ts | CSS 选区 → 图像像素区域(纯函数:DPI 缩放、四舍五入、夹紧) |
+| region/overlay.ts | 遮罩窗装配(canvas 绘制与指针事件,薄胶水层) |
 | scanner/decode.ts | zxing-wasm 纯封装:PixelData → texts,可独立单测 |
 | scanner/engine.ts | Worker 生命周期与请求-响应封装;不可用时降级主线程解码 |
 | scanner/worker.ts | WASM 初始化 + 单张解码 |
@@ -125,6 +150,7 @@ File / Blob
 |---|---|---|
 | 单元/组件 | Vitest + happy-dom | 历史去重/上限/清空、队列调度与错误隔离、URL 判定、结果卡片渲染、ingest 任务构建、状态提示 |
 | 识别管线 | Vitest(node 环境,`qrcode` 生成样张) | 正常 / 缩放模糊 / 低量化抖动 / 反色 样张解码断言 |
+| 选区数学 | Vitest | 选区状态机(归一化/最小尺寸)、CSS→图像坐标映射(DPI/夹紧) |
 | E2E | Playwright(Chromium) | 三条输入路径、多码展示、失败标注、历史回显、**零网络请求断言** |
 
 **可测性设计约束**(编码时强制遵守):
@@ -142,5 +168,6 @@ File / Blob
 | 风险 | 对策 |
 |---|---|
 | file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用(Worker 内联风险已由 `?worker&inline` 从设计上规避) |
-| zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
+| @zxing/zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |
+| 屏幕选区多显示器/高分屏 DPI 差异 | v1 仅主显示器(原点屏),缩放按图像/视口比例换算;真机体验列入人工验证 |
