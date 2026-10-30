@@ -41,7 +41,7 @@
 |---|---|---|---|
 | 1 | `feat: project skeleton` | Tauri 2 + Vite 骨架、应用图标、可运行空壳;Vitest 测试基座(含首个示例测试) | ✔ 已完成(cargo check 通过;单文件产物 dist 仅 1 个 HTML) |
 | 2 | `feat: recognition engine` | decode/engine/worker 接入 zxing-wasm;qrcode 样张管线测试(正常/低分辨率/低量化/反色/多码/空图)+ 引擎封装测试 | ✔ 已完成(17 项测试全过;wasm 内联打包验证随 #3 接线进行) |
-| 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 串行队列;EXIF 方向、降采样、缩略图;ingest/queue 单元测试 | 待开始 |
+| 3 | `feat: image ingestion` | 文件选择/拖拽/粘贴 → 串行队列;EXIF 方向、降采样、缩略图;ingest/queue 单元测试 | ✔ 已完成 |
 | 4 | `feat: results UI` | results/status 渲染模块 + main 装配(三条输入路径→队列→引擎→卡片);渲染组件测试;浏览器实测粘贴识别通过;wasm 以 data URI 内联进单文件产物 | ✔ 已完成(39 项测试;浏览器端到端:粘贴→识别→卡片渲染,截图确认) |
 | 5 | `feat: history` | 识别历史(去重置顶、上限 20、清空、回显);history 单元测试 | ✔ 已完成(46 项测试全过) |
 | 6 | `feat: theme polish` | 深浅色、轻提示、空态、视觉细节 | ✔ 已并入 #4(CSS 与装配一次实现,浏览器截图确认) |
@@ -49,6 +49,7 @@
 | 8 | `test: e2e verification` | Playwright E2E + 需求 §7 验收清单核对 | ✔ 已完成(9 项 E2E 全过,含 file:// 直开与零网络断言) |
 | 9 | `feat: screen region capture` | 屏幕选区识别:Rust 截屏命令(screenshots crate)+ 全屏遮罩选区窗 + 裁剪回传复用识别管线;选区状态机/坐标映射单测 | ✔ 已完成(56 项单测 + 9 项 E2E;真机截屏体验列入人工验证) |
 | 10 | `feat: qr generation with deep styling` | 生成功能第一批:自研 SVG 渲染器(模块形状/独立眼形配色/渐变/Logo 挖孔/透明底/预设)+ 可扫性自检徽章 + PNG/SVG/复制导出 + 生成→导出→回贴识别 E2E 闭环 | ✔ 已完成(69 项单测 + 17 项 E2E 全绿) |
+| 11 | `feat: content templates and generation history` | 生成第二批:Wi-Fi/vCard 内容模板(标准格式与转义纯函数)+ 生成历史(结构化条目、恢复表单);闭环 E2E 解码比对 | ✔ 已完成(90 项单测 + 22 项 E2E 全绿) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -90,18 +91,19 @@
 
 ### Phase 2g · 生成功能(recognition-generation 分支)
 - [x] 计划 #10:生成第一批——深度自定义与美化(模块形状/眼睛/渐变/Logo 挖孔/透明底/预设/导出/可扫性自检)
-- [ ] 下一批:Wi-Fi/vCard 内容模板、生成历史(完成后 bump 1.1.0 + tag)
+- [x] 计划 #11:内容模板(Wi-Fi/vCard)与生成历史
+- [x] 批次完成:bump 1.1.0 + tag v1.1.0 + 重打安装包
 
 ### Phase 3 · 桌面壳与打包
-- [x] 计划 #7:NSIS 安装包(基线 2.33 MiB;生成批次完成后重打)
+- [x] 计划 #7:NSIS 安装包(基线 2.33 MiB;v1.1.0 重打)
 
 ### Phase 4 · 验证
 - [x] 计划 #8:E2E + 验收清单自动化覆盖
-- [ ] 唯一剩余人工项:NSIS 安装包安装/卸载体验(双击 QrTool_1.0.0_x64-setup.exe)
+- [ ] 唯一剩余人工项:NSIS 安装包安装/卸载体验(双击 QrTool_1.1.0_x64-setup.exe)
 
-### 后期(不在 v1 范围)
-- [ ] 生成模块:文本生成、参数调节、保存 PNG/复制
-- [ ] 生成增强:配色自定义、导出 SVG、生成历史、Wi-Fi/vCard 模板
+### 后期(不在当前范围)
+- [ ] 屏幕选区增强:多显示器、全局快捷键
+- [ ] Linux / macOS 适配
 - [ ] Linux 适配
 - [ ] macOS 适配(构建需 macOS 环境或 CI macOS runner)
 
@@ -122,3 +124,4 @@
 - 2026-10-30 版本升至 **v1.0.0** 并打 tag;建立双迭代分支:`recognition`(仅识别)与 `recognition-generation`(识别+生成),main 冻结为基线参考。
 - 2026-10-30 计划 #10 生成第一批完成:双 Tab + 自研 SVG 渲染器(形状/渐变/眼睛配色/Logo 挖孔/透明底/5 预设)+ 可扫性自检 + 导出闭环;过程中修复"透明像素等同纯黑"(检测与识别路径垫白底)与"Logo 需 H 级纠错"(自动升级);69 单测 + 17 E2E 全绿。下一批:内容模板与生成历史。
 - 2026-10-30 配置 GitHub Actions:CI(push/PR 测试)与 Release(tag → 三平台产物)两套工作流,同步至两条迭代分支;待远程仓库创建后验证。
+- 2026-10-30 计划 #11 完成:Wi-Fi/vCard 内容模板(标准格式与转义)+ 生成历史(结构化条目、恢复表单);90 单测 + 22 E2E 全绿。版本升至 **v1.1.0** 并打 tag,安装包重打。

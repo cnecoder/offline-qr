@@ -1,6 +1,6 @@
 [package]
 name = "qr-tool"
-version = "1.0.0"
+version = "1.1.0"
 description = "完全离线的二维码识别小工具"
 edition = "2021"
 
