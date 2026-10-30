@@ -437,3 +437,49 @@ button.primary:hover { opacity: 0.92; color: #fff; }
   background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 .gen-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+/* 内容模式切换 */
+.mode-seg {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin: 6px 0 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mode-seg button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  border-radius: 6px;
+}
+.mode-seg button:hover { color: var(--text); }
+.mode-seg button.active { background: var(--accent); color: #fff; }
+.mode-seg button.active:hover { color: #fff; }
+.gen-form input[type='text'] {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.kind-badge {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-weak);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.kind-badge.kind-vcard { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }

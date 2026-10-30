@@ -59,7 +59,40 @@
           <div class="gen-form">
             <details open>
               <summary>内容</summary>
-              <div class="field"><textarea id="gen-text" rows="3" placeholder="输入文本或网址"></textarea></div>
+              <div class="mode-seg" id="gen-mode" role="tablist">
+                <button type="button" class="active" data-mode="text" aria-selected="true">文本</button>
+                <button type="button" data-mode="wifi" aria-selected="false">Wi-Fi</button>
+                <button type="button" data-mode="vcard" aria-selected="false">名片</button>
+              </div>
+              <div class="field" id="gen-content-text">
+                <textarea id="gen-text" rows="3" placeholder="输入文本或网址"></textarea>
+              </div>
+              <div id="gen-content-wifi" hidden>
+                <label class="row">SSID <input type="text" id="gen-wifi-ssid" placeholder="网络名称(必填)" /></label>
+                <label class="row">密码 <input type="text" id="gen-wifi-password" placeholder="Wi-Fi 密码" /></label>
+                <label class="row">加密
+                  <select id="gen-wifi-encryption">
+                    <option value="WPA">WPA/WPA2/WPA3</option>
+                    <option value="WEP">WEP</option>
+                    <option value="nopass">无密码</option>
+                  </select>
+                </label>
+                <label class="row check"><input type="checkbox" id="gen-wifi-hidden" /> 隐藏网络</label>
+              </div>
+              <div id="gen-content-vcard" hidden>
+                <label class="row">姓名 <input type="text" id="gen-v-name" placeholder="必填" /></label>
+                <div class="row2">
+                  <label class="row">手机 <input type="text" id="gen-v-mobile" /></label>
+                  <label class="row">电话 <input type="text" id="gen-v-phone" /></label>
+                </div>
+                <label class="row">邮箱 <input type="text" id="gen-v-email" /></label>
+                <div class="row2">
+                  <label class="row">组织 <input type="text" id="gen-v-org" /></label>
+                  <label class="row">职位 <input type="text" id="gen-v-title" /></label>
+                </div>
+                <label class="row">网址 <input type="text" id="gen-v-url" /></label>
+                <label class="row">地址 <input type="text" id="gen-v-address" /></label>
+              </div>
               <label class="row">纠错等级
                 <select id="gen-ecc">
                   <option value="L">L · 低(7%)</option>
@@ -147,6 +180,14 @@
             <p id="gen-status" class="status"></p>
           </div>
         </div>
+
+        <section class="history">
+          <div class="history-bar">
+            <button id="gen-history-toggle" class="history-toggle" data-testid="gen-history-toggle" aria-expanded="false">最近生成(0)</button>
+            <button id="gen-history-clear" class="link-button" data-testid="gen-history-clear" hidden>清空</button>
+          </div>
+          <ul id="gen-history-list" class="history-list" data-testid="gen-history-list" hidden></ul>
+        </section>
       </div>
     </div>
 

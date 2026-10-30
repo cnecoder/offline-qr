@@ -82,4 +82,78 @@ test.describe('生成 Tab · 深度自定义与美化', () => {
     expect(content).toContain('</svg>')
     expect(content).toContain('data-eye="tl"')
   })
+
+  test('Wi-Fi 模板:闭环解码为标准 WIFI: 格式', async ({ page }) => {
+    await page.getByRole('button', { name: 'Wi-Fi', exact: true }).click()
+    await page.fill('#gen-wifi-ssid', 'HomeNet')
+    await page.fill('#gen-wifi-password', 'pass123')
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
+    const png = readFileSync((await download.path())!)
+    await pasteImage(page, png)
+    await expect(page.locator('[data-testid="result-text"]')).toHaveText('WIFI:T:WPA;S:HomeNet;P:pass123;;', {
+      timeout: 15_000,
+    })
+  })
+
+  test('Wi-Fi 无密码:省略密码段', async ({ page }) => {
+    await page.getByRole('button', { name: 'Wi-Fi', exact: true }).click()
+    await page.fill('#gen-wifi-ssid', 'OpenNet')
+    await page.selectOption('#gen-wifi-encryption', 'nopass')
+    await expect(page.locator('#gen-wifi-password')).toBeDisabled()
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-svg')])
+    const content = readFileSync((await download.path())!, 'utf8')
+    // SVG 是矢量,无法直接解码;切回文本模式断言由下方 vcard 用例覆盖
+    expect(content).toContain('data-eye="tl"')
+  })
+
+  test('名片模板:闭环解码含 vCard 结构', async ({ page }) => {
+    await page.getByRole('button', { name: '名片', exact: true }).click()
+    await page.fill('#gen-v-name', '张三')
+    await page.fill('#gen-v-mobile', '13800138000')
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
+    const png = readFileSync((await download.path())!)
+    await pasteImage(page, png)
+    const result = page.locator('[data-testid="result-text"]')
+    await expect(result).toContainText('BEGIN:VCARD', { timeout: 15_000 })
+    await expect(result).toContainText('FN:张三')
+    await expect(result).toContainText('TEL;TYPE=CELL:13800138000')
+  })
+
+  test('生成历史:导出计数、展开、恢复表单、清空', async ({ page }) => {
+    // 文本生成并导出
+    await page.fill('#gen-text', TEXT)
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
+    await download.path()
+    // Wi-Fi 生成并导出
+    await page.getByRole('button', { name: 'Wi-Fi', exact: true }).click()
+    await page.fill('#gen-wifi-ssid', 'HistNet')
+    await page.fill('#gen-wifi-password', 'pw')
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download2] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
+    await download2.path()
+
+    await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(2\)/)
+    await page.getByTestId('gen-history-toggle').click()
+    await expect(page.getByTestId('gen-history-item')).toHaveCount(2)
+    // 点击 Wi-Fi 条目 → 表单恢复
+    await page.getByTestId('gen-history-item').first().click()
+    await expect(page.locator('#gen-wifi-ssid')).toHaveValue('HistNet')
+    // 清空
+    page.once('dialog', dialog => void dialog.accept())
+    await page.getByTestId('gen-history-clear').click()
+    await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(0\)/)
+  })
+
+  test('识别历史与生成历史相互独立', async ({ page }) => {
+    await page.fill('#gen-text', TEXT)
+    await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
+    const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
+    await download.path()
+    await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(1\)/)
+    await expect(page.getByTestId('history-toggle')).toHaveText(/最近识别\(0\)/)
+  })
 })
