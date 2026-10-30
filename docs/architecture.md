@@ -121,7 +121,20 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 - 可扫性规则在渲染器内强制:定位角恒实心环、Logo 挖孔 + 尺寸上限、默认留白 4 模块。
 - Logo 仅接受 dataURL(用户本地文件),避免 SVG 栅格化时的跨域画布污染。
 
-## 5. 前端模块职责
+## 4c. 内容模板与生成历史(recognition-generation 分支)
+
+```
+GenContent(text | wifi | vcard,表单状态)
+  → content.ts:contentToText(纯函数)
+      wifi → WIFI:T:WPA;S:…;P:…;H:true;;(\ ; , : " 转义;nopass 省略 P)
+      vcard → vCard 3.0 文本(空字段省略,\r\n 行结束,, ; \ 与换行转义)
+      无效输入(空 SSID/全空名片)→ null
+  → 复用 4b 管线:矩阵 → renderQrSvg → 预览/导出/自检
+生成历史(gen-history.ts):结构化条目(GenContent + 时间)存 localStorage
+  记录时机:导出 PNG/SVG 或复制成功;按内容 JSON 去重置顶;点击条目恢复表单
+```
+
+## 5. 前端模块职责(原 §5)
 
 | 模块 | 职责 |
 |---|---|
@@ -137,6 +150,8 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 | generator/export.ts | PNG/SVG 下载与复制(薄胶水) |
 | generator/scancheck.ts | 可扫性自检(复用 decodePixels) |
 | generator/panel.ts | 生成面板装配(表单 ↔ 状态 ↔ 预览) |
+| generator/content.ts | 内容模型与模板编码(GenContent → 文本,纯函数) |
+| generator/gen-history.ts | 生成历史 store(结构化条目,localStorage) |
 | scanner/decode.ts | zxing-wasm 纯封装:PixelData → texts,可独立单测 |
 | scanner/engine.ts | Worker 生命周期与请求-响应封装;不可用时降级主线程解码 |
 | scanner/worker.ts | WASM 初始化 + 单张解码 |
@@ -175,6 +190,8 @@ Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase
 | 选区数学 | Vitest | 选区状态机(归一化/最小尺寸)、CSS→图像坐标映射(DPI/夹紧) |
 | 生成渲染器 | Vitest | 各形状 path/渐变 defs/眼睛独立配色/Logo 挖孔/留白 viewBox 断言 |
 | 生成闭环 | Playwright E2E | 样式切换 → 导出 PNG → 回贴识别 Tab → 解码回读原文 |
+| 内容模板 | Vitest + E2E | WIFI:/vCard 编码与转义(单测);导出回贴解码比对(E2E) |
+| 生成历史 | Vitest + E2E | 去重/上限/清空/损坏容错(单测);恢复表单(E2E) |
 | E2E | Playwright(Chromium) | 三条输入路径、多码展示、失败标注、历史回显、**零网络请求断言** |
 
 **可测性设计约束**(编码时强制遵守):
