@@ -73,6 +73,12 @@
 - `npm run fixtures` 重新生成;`npm run verify:fixtures` 自动 QA 门禁(引擎回读,13/13 通过)
 - 附人工测试清单 `test_picture/fixtures/index.md`;用户自己的截图放 `test_picture/` 根目录,互不干扰
 
+## Windows 绿色版(2026-10-31)
+
+- `scripts/make-portable.mjs`(`npm run portable`):单 exe(静态链接 WebView2Loader,零 dll 依赖)+ 使用说明 → zip,输出至 `src-tauri/target/release/bundle/portable/`
+- Release 工作流 Windows 任务已接入:每次发 tag 自动把绿色版 zip 上传到 Release 页
+- 历史数据存于当前用户 WebView2 数据目录,不随 exe 迁移(使用说明中已注明)
+
 ## 阶段与任务
 
 ### Phase 0 · 需求与设计

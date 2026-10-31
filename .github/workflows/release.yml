@@ -75,3 +75,13 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Build portable zip (Windows 免安装版)
+        if: matrix.platform == 'windows-latest'
+        run: node scripts/make-portable.mjs
+
+      - name: Upload portable zip to release
+        if: matrix.platform == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/QrTool_${{ github.ref_name }}_portable_x64.zip" --clobber
