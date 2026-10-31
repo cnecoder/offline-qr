@@ -34,6 +34,9 @@
 2. **git 纪律**:每个特性开发、每个 bug 修复都必须有对应 commit,保证过程可追溯、可回溯。commit message 使用 `feat:` / `fix:` / `docs:` / `chore:` / `refactor:` 前缀。
 3. **task.md 同步**:进度变化必须同步到本文档;发现文档与实现不一致,第一步是修齐文档。
 4. **开发顺序**:需求文档 → 架构设计 → UI 设计 → 开发计划,全部定稿后再动手编码。
+5. **影响面测试**:每次修改先评估影响面,只跑受影响模块的测试;**推送远程之前必须全量**(npm test + build + e2e)。
+6. **Release 纪律**:release 版本不在本地编译;仅当用户明确要求发布时才打 tag 推送,触发远程 Release 构建。
+7. **覆盖率复盘**:每个线上问题必须复盘"为什么测试没拦住",补对应测试或记入盲区清单(架构文档 §8)。
 
 ## 开发计划(commit 粒度)
 
@@ -51,6 +54,7 @@
 | 10 | `feat: qr generation with deep styling` | 生成功能第一批:自研 SVG 渲染器(模块形状/独立眼形配色/渐变/Logo 挖孔/透明底/预设)+ 可扫性自检徽章 + PNG/SVG/复制导出 + 生成→导出→回贴识别 E2E 闭环 | ✔ 已完成(69 项单测 + 17 项 E2E 全绿) |
 | 11 | `feat: content templates and generation history` | 生成第二批:Wi-Fi/vCard 内容模板(标准格式与转义纯函数)+ 生成历史(结构化条目、恢复表单);闭环 E2E 解码比对 | ✔ 已完成(90 项单测 + 22 项 E2E 全绿) |
 | 12 | `fix: multi-monitor region capture and decode hardening` | 人工反馈两项修复:① 无码图卡"识别中"→ 引擎三重兜底(8s 超时终止重建/onerror 重建/maxNumberOfSymbols 有界);② 屏幕选区仅主屏 → 逐屏截屏+每屏一个遮罩窗(逻辑坐标定位) | ✔ 已完成(92 项单测 + 22 项 E2E 全绿;出 v1.2.0) |
+| 13 | `feat: structured logging` + `fix: region decode diagnostics and fade-in` | 日志系统(Rust 文件日志 + 前端 ms 时间戳日志,统一写入本地文件);屏幕选区淡入 + 裁剪改 ImageBitmap + 全链路诊断日志 | 进行中 |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
