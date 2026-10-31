@@ -1,9 +1,32 @@
-use std::io::Cursor;
+use std::io::{Cursor, Write as _};
+use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use base64::Engine as _;
+use chrono::Local as LocalTime;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+
+/// 追加一行到当天日志文件(FR-10:人类可读,毫秒精度)
+fn write_line(app: &AppHandle, line: &str) {
+    println!("{line}");
+    let path: Option<PathBuf> = (|| {
+        let dir = app.path().app_local_data_dir().ok()?.join("logs");
+        std::fs::create_dir_all(&dir).ok()?;
+        Some(dir.join(format!("qr-tool-{}.log", LocalTime::now().format("%Y%m%d"))))
+    })();
+    if let Some(path) = path {
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(file, "{line}");
+        }
+    }
+}
+
+fn log_event(app: &AppHandle, scope: &str, message: &str) {
+    let ts = LocalTime::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    write_line(app, &format!("[{ts}][{scope}] {message}"));
+}
 
 #[derive(Serialize, Clone)]
 struct CaptureData {
@@ -64,6 +87,7 @@ fn close_all_overlays(app: &AppHandle) {
     for (label, window) in app.webview_windows() {
         if label.starts_with("region-overlay") {
             let _ = window.close();
+            log_event(app, "capture", &format!("遮罩窗 {label} 已关闭"));
         }
     }
 }
@@ -73,8 +97,20 @@ fn close_all_overlays(app: &AppHandle) {
 /// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
 #[tauri::command]
 async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+    let t0 = Instant::now();
+    log_event(&app, "capture", "开始屏幕截取");
     let captures = capture_all_screens()?;
     let count = captures.len();
+    for (i, sc) in captures.iter().enumerate() {
+        log_event(
+            &app,
+            "capture",
+            &format!(
+                "屏幕 {i}: {}x{} px, 逻辑位置 ({:.0},{:.0}) 尺寸 {:.0}x{:.0}",
+                sc.data.width, sc.data.height, sc.x, sc.y, sc.w, sc.h
+            ),
+        );
+    }
     *state.0.lock().unwrap() = captures;
     close_all_overlays(&app);
     for i in 0..count {
@@ -82,9 +118,10 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
             let guard = state.0.lock().unwrap();
             guard[i].clone()
         };
+        let label = format!("region-overlay-{i}");
         WebviewWindowBuilder::new(
             &app,
-            format!("region-overlay-{i}"),
+            label.clone(),
             WebviewUrl::App("index.html".into()),
         )
         .title(format!("屏幕选区 {}", i + 1))
@@ -96,18 +133,48 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
         .position(screen.x, screen.y)
         .inner_size(screen.w, screen.h)
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| {
+            log_event(&app, "capture", &format!("遮罩窗 {label} 创建失败:{e}"));
+            e.to_string()
+        })?;
+        log_event(
+            &app,
+            "capture",
+            &format!(
+                "遮罩窗 {label} 已创建({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
+                screen.x,
+                screen.y,
+                screen.w,
+                screen.h,
+                t0.elapsed().as_millis()
+            ),
+        );
     }
+    log_event(
+        &app,
+        "capture",
+        &format!("全部遮罩就绪,共 {count} 屏,总耗时 {}ms", t0.elapsed().as_millis()),
+    );
     Ok(())
 }
 
 /// 遮罩窗启动时取回自己那一屏的截屏数据(按窗口序号)
 #[tauri::command]
 async fn get_capture(
+    app: AppHandle,
     state: State<'_, CaptureState>,
     index: usize,
 ) -> Result<Option<CaptureData>, String> {
-    Ok(state.0.lock().unwrap().get(index).map(|s| s.data.clone()))
+    let capture = state.0.lock().unwrap().get(index).map(|s| s.data.clone());
+    match &capture {
+        Some(data) => log_event(
+            &app,
+            "capture",
+            &format!("遮罩窗 {index} 取图:{}x{},base64 {} 字符", data.width, data.height, data.png_base64.len()),
+        ),
+        None => log_event(&app, "capture", &format!("遮罩窗 {index} 取图失败:状态为空(可能非应用内发起)")),
+    }
+    Ok(capture)
 }
 
 /// 选区完成:Rust 侧只做中转(裁剪由遮罩窗 canvas 完成),关闭全部遮罩并广播给主窗
@@ -117,6 +184,7 @@ async fn finish_capture(
     state: State<'_, CaptureState>,
     png_base64: String,
 ) -> Result<(), String> {
+    log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
     *state.0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
     app.emit("region-captured", png_base64)
@@ -126,8 +194,18 @@ async fn finish_capture(
 /// 取消选区:关闭全部遮罩
 #[tauri::command]
 async fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+    log_event(&app, "capture", "选区取消");
     *state.0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
+    Ok(())
+}
+
+/// 前端日志批量落盘(FR-10)
+#[tauri::command]
+async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
+    for line in &lines {
+        write_line(&app, line);
+    }
     Ok(())
 }
 
@@ -140,7 +218,8 @@ pub fn run() {
             start_capture,
             get_capture,
             finish_capture,
-            cancel_capture
+            cancel_capture,
+            append_log
         ])
         .run(tauri::generate_context!())
         .expect("QrTool 运行失败");
