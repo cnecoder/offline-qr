@@ -65,6 +65,12 @@
 - `.github/workflows/release.yml`:推送 `v*` tag → 三平台矩阵构建(Windows NSIS / Linux AppImage+deb / macOS dmg)→ tauri-action 自动创建 Release;含 tag↔version 一致性守卫
 - 已同步到两条迭代分支(recognition 分支 cherry-pick);创建远程后 `git push origin main v1.0.0 recognition recognition-generation` 即触发验证
 
+## 人工测试样张(2026-10-31)
+
+- `scripts/gen-test-fixtures.mjs` 生成 13 张覆盖性样张至 `test_picture/fixtures/`:文本/中文/长文/Wi-Fi 转义/vCard/一图多码/低质量/反色/圆点彩色/小尺寸/Logo 图
+- `npm run fixtures` 重新生成;`npm run verify:fixtures` 自动 QA 门禁(引擎回读,13/13 通过)
+- 附人工测试清单 `test_picture/fixtures/index.md`;用户自己的截图放 `test_picture/` 根目录,互不干扰
+
 ## 阶段与任务
 
 ### Phase 0 · 需求与设计
@@ -117,3 +123,4 @@
 - 2026-10-30 计划 #9 屏幕选区识别完成:FR-7 落地(Rust 截屏 + 遮罩选区 + 管线复用),选区数学纯函数单测;56 单测 + 9 E2E 全绿;真机截屏体验待人工验证。
 - 2026-10-30 版本升至 **v1.0.0** 并打 tag;建立双迭代分支:`recognition`(仅识别)与 `recognition-generation`(识别+生成),main 冻结为基线参考。
 - 2026-10-30 配置 GitHub Actions:CI(push/PR 测试)与 Release(tag → 三平台产物)两套工作流;待远程仓库创建后验证。
+- 2026-10-31 新增人工测试样张:`scripts/gen-test-fixtures.mjs` + `verify-fixtures.mjs`(13 张样张,引擎回读 QA 全过);AGENTS.md 技术栈描述修正为 zxing-wasm。
