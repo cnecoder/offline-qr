@@ -212,5 +212,6 @@ GenContent(text | wifi | vcard,表单状态)
 | @zxing/zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |
 | 屏幕选区多显示器/高分屏 DPI 差异 | v1 仅主显示器(原点屏),缩放按图像/视口比例换算;真机体验列入人工验证 |
+| Tauri Windows 同步命令内创建窗口死锁 | 涉窗口操作命令一律 `async fn`(start_capture 等已修复:v1.1.1,同步命令阻塞主线程事件循环会整窗无响应) |
 | 美化样式破坏可扫性 | 渲染器规则强制(实心眼环/挖孔/留白)+ 内置引擎实时试扫徽章 + E2E 闭环断言 |
 | SVG 栅格化画布污染 | Logo 仅接受 dataURL;全资源本地内联 |

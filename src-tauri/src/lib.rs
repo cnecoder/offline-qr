@@ -42,9 +42,11 @@ fn close_overlay(app: &AppHandle) {
     }
 }
 
-/// 截屏 → 存状态 → 打开全屏遮罩窗口(前端进入选区模式)
+/// 截屏 → 存状态 → 打开全屏遮罩窗口(前端进入选区模式)。
+/// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
+/// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
 #[tauri::command]
-fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
     let data = capture_primary_screen()?;
     *state.0.lock().unwrap() = Some(data);
     close_overlay(&app);
@@ -55,6 +57,7 @@ fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), S
         .fullscreen(true)
         .always_on_top(true)
         .skip_taskbar(true)
+        .background_color(tauri::window::Color(0, 0, 0, 255))
         .build()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -62,13 +65,13 @@ fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), S
 
 /// 遮罩窗启动时取回截屏数据
 #[tauri::command]
-fn get_capture(state: State<'_, CaptureState>) -> Result<Option<CaptureData>, String> {
+async fn get_capture(state: State<'_, CaptureState>) -> Result<Option<CaptureData>, String> {
     Ok(state.0.lock().unwrap().clone())
 }
 
 /// 选区完成:Rust 侧只做中转(裁剪由遮罩窗 canvas 完成),关闭窗口并广播给主窗
 #[tauri::command]
-fn finish_capture(
+async fn finish_capture(
     app: AppHandle,
     state: State<'_, CaptureState>,
     png_base64: String,
@@ -81,7 +84,7 @@ fn finish_capture(
 
 /// 取消选区
 #[tauri::command]
-fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+async fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
     *state.0.lock().unwrap() = None;
     close_overlay(&app);
     Ok(())
