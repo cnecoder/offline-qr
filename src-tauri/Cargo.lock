@@ -2690,6 +2690,7 @@ name = "qr-tool"
 version = "1.2.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "image",
  "screenshots",
  "serde",

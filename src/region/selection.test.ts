@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { createSelection, normalizeRect } from './selection'
+import { createSelection, normalizeRect, overlayIndexFromLabel } from './selection'
+
+describe('overlayIndexFromLabel', () => {
+  it('解析遮罩窗口序号', () => {
+    expect(overlayIndexFromLabel('region-overlay-0')).toBe(0)
+    expect(overlayIndexFromLabel('region-overlay-12')).toBe(12)
+    expect(overlayIndexFromLabel('main')).toBeNull()
+    expect(overlayIndexFromLabel('')).toBeNull()
+  })
+})
 
 describe('normalizeRect', () => {
   it('反向拖拽也归一化为正矩形', () => {

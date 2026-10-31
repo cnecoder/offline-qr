@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
+import { log } from '../shared/log'
 import { toImageRect } from './crop'
-import { createSelection, type Rect } from './selection'
+import { overlayIndexFromLabel, createSelection, type Rect } from './selection'
 
 interface CaptureData {
   width: number
@@ -14,8 +15,7 @@ const MIN_SIZE = 4
 async function resolveIndex(): Promise<number> {
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    const match = /(\d+)$/.exec(getCurrentWindow().label)
-    return match ? Number(match[1]) : 0
+    return overlayIndexFromLabel(getCurrentWindow().label) ?? 0
   } catch {
     return 0
   }
@@ -23,25 +23,32 @@ async function resolveIndex(): Promise<number> {
 
 /** 遮罩窗口:全屏显示截屏,拖拽选区后裁剪回传主窗 */
 async function boot(): Promise<void> {
+  const t0 = performance.now()
+  const index = await resolveIndex()
+  log('overlay', `启动:index=${index},视口 ${window.innerWidth}x${window.innerHeight},dpr=${window.devicePixelRatio}`)
+
   let data: CaptureData | null = null
   try {
-    data = await invoke<CaptureData | null>('get_capture', { index: await resolveIndex() })
-  } catch {
-    data = null
+    data = await invoke<CaptureData | null>('get_capture', { index })
+  } catch (err) {
+    log('overlay', `get_capture 调用失败:${err instanceof Error ? err.message : String(err)}`)
   }
 
   const root = document.createElement('div')
   root.className = 'overlay'
   if (!data) {
+    log('overlay', '无截屏数据,降级为提示文案')
+    root.classList.add('visible')
     root.textContent = '未获取到屏幕图像(请在应用内发起屏幕选区)'
     document.body.append(root)
     return
   }
+  log('overlay', `截屏数据就绪:${data.width}x${data.height},base64 ${data.png_base64.length} 字符`)
 
   const image = document.createElement('img')
   image.className = 'overlay-image'
-  image.src = `data:image/png;base64,${data.png_base64}`
   image.alt = '屏幕截图'
+  image.src = `data:image/png;base64,${data.png_base64}`
 
   const canvas = document.createElement('canvas')
   canvas.className = 'overlay-canvas'
@@ -50,12 +57,14 @@ async function boot(): Promise<void> {
 
   const ctx = canvas.getContext('2d')
   if (!ctx) {
+    log('overlay', '无法创建画布上下文,取消选区')
     void invoke('cancel_capture').catch(() => {})
     return
   }
 
   const selection = createSelection(MIN_SIZE)
   let dpr = window.devicePixelRatio || 1
+  let bitmap: ImageBitmap | null = null
 
   function redraw(): void {
     ctx!.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -82,7 +91,17 @@ async function boot(): Promise<void> {
     const current = data!
     const scale = current.width / window.innerWidth
     const imageRect = toImageRect(rect, scale, current.width, current.height)
+    log(
+      'overlay',
+      `选区完成 CSS ${rect.width}x${rect.height} @(${rect.x},${rect.y}) → 图像 ${imageRect.width}x${imageRect.height} @(${imageRect.x},${imageRect.y}),scale=${scale.toFixed(3)}`,
+    )
     if (imageRect.width < 2 || imageRect.height < 2) {
+      log('overlay', '选区过小,按取消处理')
+      void invoke('cancel_capture').catch(() => {})
+      return
+    }
+    if (!bitmap) {
+      log('overlay', '位图未就绪,按取消处理')
       void invoke('cancel_capture').catch(() => {})
       return
     }
@@ -94,23 +113,15 @@ async function boot(): Promise<void> {
       void invoke('cancel_capture').catch(() => {})
       return
     }
-    cropCtx.drawImage(
-      image,
-      imageRect.x,
-      imageRect.y,
-      imageRect.width,
-      imageRect.height,
-      0,
-      0,
-      imageRect.width,
-      imageRect.height,
-    )
+    cropCtx.drawImage(bitmap, imageRect.x, imageRect.y, imageRect.width, imageRect.height, 0, 0, imageRect.width, imageRect.height)
     const dataUrl = crop.toDataURL('image/png')
     const pngBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+    log('overlay', `裁剪 PNG ${imageRect.width}x${imageRect.height},base64 ${pngBase64.length} 字符,回传主窗`)
     try {
       await invoke('finish_capture', { pngBase64 })
-    } catch {
-      // 主窗不在线等异常:窗口由用户关闭兜底
+      log('overlay', 'finish_capture 调用成功')
+    } catch (err) {
+      log('overlay', `finish_capture 失败:${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -119,6 +130,7 @@ async function boot(): Promise<void> {
   canvas.addEventListener('pointerdown', event => {
     canvas.setPointerCapture(event.pointerId)
     selection.begin(point(event))
+    log('overlay', `开始选区 @${event.clientX},${event.clientY}`)
     redraw()
   })
   canvas.addEventListener('pointermove', event => {
@@ -134,11 +146,24 @@ async function boot(): Promise<void> {
     if (rect) void finish(rect)
   })
   window.addEventListener('keydown', event => {
-    if (event.key === 'Escape') void invoke('cancel_capture').catch(() => {})
+    if (event.key === 'Escape') {
+      log('overlay', 'Esc 取消选区')
+      void invoke('cancel_capture').catch(() => {})
+    }
   })
   window.addEventListener('resize', resize)
 
   resize()
+
+  // 位图就绪后淡入:消除触发时的白闪/突现
+  try {
+    await image.decode()
+    bitmap = await createImageBitmap(image)
+    log('overlay', `截图解码完成,耗时 ${Math.round(performance.now() - t0)}ms,淡入显示`)
+  } catch (err) {
+    log('overlay', `截图解码失败:${err instanceof Error ? err.message : String(err)}`)
+  }
+  requestAnimationFrame(() => root.classList.add('visible'))
 }
 
 void boot()

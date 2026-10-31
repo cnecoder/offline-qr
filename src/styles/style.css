@@ -263,7 +263,10 @@ button.primary:hover { opacity: 0.92; color: #fff; }
   background: #000;
   color: #fff;
   font-size: 14px;
+  opacity: 0;
+  transition: opacity 0.18s ease-out;
 }
+.overlay.visible { opacity: 1; }
 .overlay-image {
   position: absolute;
   inset: 0;
