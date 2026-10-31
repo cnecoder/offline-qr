@@ -1,0 +1,77 @@
+# Release:推送 v* tag 后自动构建三平台产物并创建 GitHub Release。
+# - Windows: NSIS 安装包
+# - Linux:   AppImage / deb
+# - macOS:   dmg (Apple Silicon;如需 Intel 可在 matrix 中追加 --target x86_64-apple-darwin)
+# 注意:tag 必须与 src-tauri/tauri.conf.json 的 version 一致(工作流内有守卫)。
+# 本地代理(HTTPS_PROXY)仅本机开发需要;CI 到 GitHub 网络畅通,无需代理。
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies (webkit2gtk 等)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Check tag matches app version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$VERSION" != "${{ github.ref_name }}" ]; then
+            echo "::error::tag ${{ github.ref_name }} 与 tauri.conf.json version v$VERSION 不一致"
+            exit 1
+          fi
+
+      - name: Build and upload release assets
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'QrTool ${{ github.ref_name }}'
+          releaseBody: '离线二维码识别与生成工具。见 Assets 下载对应平台安装包。'
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
