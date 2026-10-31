@@ -14,13 +14,15 @@ export interface PixelData {
 // Worker 以 blob URL 运行,无法按模块相对路径解析 wasm,这里固定覆写定位逻辑
 prepareZXingModule({ overrides: { locateFile: () => wasmUrl } })
 
-// 固定解码参数:识别率优先(允许更慢),只识别 QR Code
+// 固定解码参数:识别率优先(允许更慢),只识别 QR Code;
+// maxNumberOfSymbols 有界,避免在大面积无码图上做海量符号搜索
 const READER_OPTIONS: ReaderOptions = {
   formats: ['QRCode'],
   tryHarder: true,
   tryRotate: true,
   tryInvert: true,
   tryDownscale: true,
+  maxNumberOfSymbols: 8,
 }
 
 /** 解码一张图的像素,返回其中全部 QR 码文本(一图多码) */

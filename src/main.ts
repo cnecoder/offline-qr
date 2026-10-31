@@ -4,7 +4,7 @@ import './styles/style.css'
 async function isOverlayWindow(): Promise<boolean> {
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window')
-    return getCurrentWindow().label === 'region-overlay'
+    return getCurrentWindow().label.startsWith('region-overlay')
   } catch {
     // 浏览器环境(无 Tauri IPC):支持 ?overlay=1 直开调试
     return new URLSearchParams(window.location.search).has('overlay')

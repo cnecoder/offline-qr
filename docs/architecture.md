@@ -89,19 +89,22 @@ File / Blob
 ```
 主窗 [屏幕选区] 按钮(仅 __TAURI_INTERNALS__ 存在时显示)
   → invoke start_capture
-      Rust: screenshots 截取主显示器 → PNG → base64 存入 Mutex<State>
-      Rust: 创建全屏无边框置顶遮罩窗口 region-overlay(加载同一前端)
-遮罩窗(main.ts 按窗口 label 进入 overlay 模式)
-  → invoke get_capture → 全屏显示截图 + 十字光标 + 暗化
+      Rust: 逐屏截屏(screenshots crate)→ 每屏 PNG/base64 存入 Mutex<Vec<ScreenCapture>>
+            (含该屏逻辑坐标 = 物理 / scale_factor)
+      Rust: 每个显示器创建一个遮罩窗口 region-overlay-<i>(无边框置顶,按逻辑坐标定位)
+遮罩窗(main.ts 按窗口 label 序号进入 overlay 模式)
+  → invoke get_capture(index) → 全屏显示该屏截图 + 十字光标 + 暗化
   → 拖拽出矩形(选区状态机,纯函数)
   → 松手:canvas 按图像像素裁剪 → toDataURL → invoke finish_capture(pngBase64)
   → Esc:invoke cancel_capture
-Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase64)
+Rust(finish/cancel):关闭全部遮罩窗;finish 额外 emit "region-captured"(pngBase64)
 主窗 listen("region-captured") → base64 → File → 复用 enqueueFiles 识别管线
 ```
 
 - 选区坐标换算(CSS px → 图像 px,含 DPI 缩放)与选区状态机均为纯函数,独立单测。
 - 浏览器形态无 Tauri IPC:按钮隐藏;直接打开遮罩 URL 时降级为提示文案。
+- 引擎侧兜底:单张解码超时(8s)或 Worker 异常终止时自动重建 Worker 并按失败落定,
+  "识别中"状态必然终结(见 §5 engine 与 §9 风险表)。
 
 ## 4b. 生成管线(recognition-generation 分支)
 
@@ -211,7 +214,8 @@ GenContent(text | wifi | vcard,表单状态)
 | file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用(Worker 内联风险已由 `?worker&inline` 从设计上规避) |
 | @zxing/zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |
-| 屏幕选区多显示器/高分屏 DPI 差异 | v1 仅主显示器(原点屏),缩放按图像/视口比例换算;真机体验列入人工验证 |
-| Tauri Windows 同步命令内创建窗口死锁 | 涉窗口操作命令一律 `async fn`(start_capture 等已修复:v1.1.1,同步命令阻塞主线程事件循环会整窗无响应) |
+| 屏幕选区多显示器/高分屏 DPI 差异 | 逐屏遮罩 + 逻辑坐标定位(物理/缩放);混合缩放倍率场景需真机回归 |
+| Tauri Windows 同步命令内创建窗口死锁 | 涉窗口操作命令一律 `async fn`(v1.1.1 修复:同步命令阻塞主线程事件循环会整窗无响应) |
+| 解码后台静默挂起(Worker 异常等) | 引擎三重兜底:8s 超时终止重建 / Worker onerror 重建 / maxNumberOfSymbols 有界——"识别中"必然终结(v1.2.0) |
 | 美化样式破坏可扫性 | 渲染器规则强制(实心眼环/挖孔/留白)+ 内置引擎实时试扫徽章 + E2E 闭环断言 |
 | SVG 栅格化画布污染 | Logo 仅接受 dataURL;全资源本地内联 |

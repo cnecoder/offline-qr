@@ -50,6 +50,7 @@
 | 9 | `feat: screen region capture` | 屏幕选区识别:Rust 截屏命令(screenshots crate)+ 全屏遮罩选区窗 + 裁剪回传复用识别管线;选区状态机/坐标映射单测 | ✔ 已完成(56 项单测 + 9 项 E2E;真机截屏体验列入人工验证) |
 | 10 | `feat: qr generation with deep styling` | 生成功能第一批:自研 SVG 渲染器(模块形状/独立眼形配色/渐变/Logo 挖孔/透明底/预设)+ 可扫性自检徽章 + PNG/SVG/复制导出 + 生成→导出→回贴识别 E2E 闭环 | ✔ 已完成(69 项单测 + 17 项 E2E 全绿) |
 | 11 | `feat: content templates and generation history` | 生成第二批:Wi-Fi/vCard 内容模板(标准格式与转义纯函数)+ 生成历史(结构化条目、恢复表单);闭环 E2E 解码比对 | ✔ 已完成(90 项单测 + 22 项 E2E 全绿) |
+| 12 | `fix: multi-monitor region capture and decode hardening` | 人工反馈两项修复:① 无码图卡"识别中"→ 引擎三重兜底(8s 超时终止重建/onerror 重建/maxNumberOfSymbols 有界);② 屏幕选区仅主屏 → 逐屏截屏+每屏一个遮罩窗(逻辑坐标定位) | ✔ 已完成(92 项单测 + 22 项 E2E 全绿;出 v1.2.0) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -139,3 +140,4 @@
 - 2026-10-30 计划 #11 完成:Wi-Fi/vCard 内容模板(标准格式与转义)+ 生成历史(结构化条目、恢复表单);90 单测 + 22 E2E 全绿。版本升至 **v1.1.0** 并打 tag,安装包重打。
 - 2026-10-31 新增人工测试样张:`scripts/gen-test-fixtures.mjs` + `verify-fixtures.mjs`(13 张样张,引擎回读 QA 全过);AGENTS.md 技术栈描述修正为 zxing-wasm。
 - 2026-10-31 **fix:屏幕选区在主屏死锁**(人工测试发现)——根因:Tauri 在 Windows 上于同步 command 内创建窗口会死锁事件循环;四个截屏命令改为 async,遮罩窗口加黑色底色;出 v1.1.1。
+- 2026-11-01 **v1.2.0:人工反馈两项修复**——① 无码图卡"识别中":引擎三重兜底(8s 超时终止重建 Worker / onerror 自动重建 / maxNumberOfSymbols=8 有界),92 单测含超时与重建用例;② 屏幕选区仅主屏:逐屏截屏 + 每屏一个遮罩窗(label 序号对应,逻辑坐标定位),全部屏幕均可独立框选。

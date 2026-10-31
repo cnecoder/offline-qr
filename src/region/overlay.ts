@@ -10,11 +10,22 @@ interface CaptureData {
 
 const MIN_SIZE = 4
 
+/** 遮罩窗口按 label 序号(region-overlay-<i>)对应各自的截屏数据 */
+async function resolveIndex(): Promise<number> {
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    const match = /(\d+)$/.exec(getCurrentWindow().label)
+    return match ? Number(match[1]) : 0
+  } catch {
+    return 0
+  }
+}
+
 /** 遮罩窗口:全屏显示截屏,拖拽选区后裁剪回传主窗 */
 async function boot(): Promise<void> {
   let data: CaptureData | null = null
   try {
-    data = await invoke<CaptureData | null>('get_capture')
+    data = await invoke<CaptureData | null>('get_capture', { index: await resolveIndex() })
   } catch {
     data = null
   }
