@@ -67,6 +67,12 @@
 - `.github/workflows/release.yml`:推送 `v*` tag → 三平台矩阵构建(Windows NSIS / Linux AppImage+deb / macOS dmg)→ tauri-action 自动创建 Release;含 tag↔version 一致性守卫
 - 已同步到两条迭代分支(recognition 分支 cherry-pick);创建远程后 `git push origin main v1.0.0 recognition recognition-generation` 即触发验证
 
+## 人工测试样张(2026-10-31)
+
+- `scripts/gen-test-fixtures.mjs` 生成 13 张覆盖性样张至 `test_picture/fixtures/`:文本/中文/长文/Wi-Fi 转义/vCard/一图多码/低质量/反色/圆点彩色/小尺寸/Logo 图
+- `npm run fixtures` 重新生成;`npm run verify:fixtures` 自动 QA 门禁(引擎回读,13/13 通过)
+- 附人工测试清单 `test_picture/fixtures/index.md`;用户自己的截图放 `test_picture/` 根目录,互不干扰
+
 ## 阶段与任务
 
 ### Phase 0 · 需求与设计
@@ -125,3 +131,4 @@
 - 2026-10-30 计划 #10 生成第一批完成:双 Tab + 自研 SVG 渲染器(形状/渐变/眼睛配色/Logo 挖孔/透明底/5 预设)+ 可扫性自检 + 导出闭环;过程中修复"透明像素等同纯黑"(检测与识别路径垫白底)与"Logo 需 H 级纠错"(自动升级);69 单测 + 17 E2E 全绿。下一批:内容模板与生成历史。
 - 2026-10-30 配置 GitHub Actions:CI(push/PR 测试)与 Release(tag → 三平台产物)两套工作流,同步至两条迭代分支;待远程仓库创建后验证。
 - 2026-10-30 计划 #11 完成:Wi-Fi/vCard 内容模板(标准格式与转义)+ 生成历史(结构化条目、恢复表单);90 单测 + 22 E2E 全绿。版本升至 **v1.1.0** 并打 tag,安装包重打。
+- 2026-10-31 新增人工测试样张:`scripts/gen-test-fixtures.mjs` + `verify-fixtures.mjs`(13 张样张,引擎回读 QA 全过);AGENTS.md 技术栈描述修正为 zxing-wasm。
