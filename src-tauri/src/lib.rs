@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use base64::Engine as _;
 use chrono::Local as LocalTime;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
@@ -171,7 +171,7 @@ fn set_main_window_visible(app: &AppHandle, visible: bool) -> Result<(), String>
 /// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
 /// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
 #[tauri::command]
-async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+async fn start_capture(app: AppHandle) -> Result<(), String> {
     let t0 = Instant::now();
     log_event(&app, "capture", "开始屏幕截取");
     // 先隐藏主窗(主线程执行 + 等待完成):它不属于可选内容,且避免紫色 UI 出现在选区画面里
@@ -189,10 +189,11 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
             ),
         );
     }
-    *state.0.lock().unwrap() = captures;
+    *app.state::<CaptureState>().0.lock().unwrap() = captures;
     close_all_overlays(&app);
     for i in 0..count {
         let screen = {
+            let state = app.state::<CaptureState>();
             let guard = state.0.lock().unwrap();
             guard[i].clone()
         };
@@ -261,12 +262,14 @@ async fn show_overlay(app: AppHandle, index: usize) -> Result<(), String> {
 
 /// 遮罩窗启动时取回自己那一屏的截屏数据(按窗口序号)
 #[tauri::command]
-async fn get_capture(
-    app: AppHandle,
-    state: State<'_, CaptureState>,
-    index: usize,
-) -> Result<Option<CaptureData>, String> {
-    let capture = state.0.lock().unwrap().get(index).map(|s| s.data.clone());
+async fn get_capture(app: AppHandle, index: usize) -> Result<Option<CaptureData>, String> {
+    let capture = app
+        .state::<CaptureState>()
+        .0
+        .lock()
+        .unwrap()
+        .get(index)
+        .map(|s| s.data.clone());
     match &capture {
         Some(data) => log_event(
             &app,
@@ -280,13 +283,9 @@ async fn get_capture(
 
 /// 选区完成:Rust 侧只做中转(裁剪由遮罩窗 canvas 完成),关闭全部遮罩并广播给主窗
 #[tauri::command]
-async fn finish_capture(
-    app: AppHandle,
-    state: State<'_, CaptureState>,
-    png_base64: String,
-) -> Result<(), String> {
+async fn finish_capture(app: AppHandle, png_base64: String) -> Result<(), String> {
     log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
-    *state.0.lock().unwrap() = Vec::new();
+    *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
     let _ = set_main_window_visible(&app, true);
     app.emit("region-captured", png_base64)
@@ -295,9 +294,9 @@ async fn finish_capture(
 
 /// 取消选区:关闭全部遮罩
 #[tauri::command]
-async fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
+async fn cancel_capture(app: AppHandle) -> Result<(), String> {
     log_event(&app, "capture", "选区取消");
-    *state.0.lock().unwrap() = Vec::new();
+    *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
     let _ = set_main_window_visible(&app, true);
     Ok(())
