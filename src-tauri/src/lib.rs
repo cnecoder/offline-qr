@@ -457,8 +457,9 @@ pub fn run() {
                 &handle,
                 "app",
                 &format!(
-                    "应用启动 v{},构建 {build_label},exe 修改时间 {exe_meta},日志文件:{}",
+                    "应用启动 v{},构建标记({}),日志文件:{}",
                     app.package_info().version,
+                    build_marker_text(),
                     log_file_path(&handle)
                         .map(|p| p.display().to_string())
                         .unwrap_or_else(|| "不可用".into())
