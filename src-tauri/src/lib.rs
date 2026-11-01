@@ -95,25 +95,36 @@ fn capture_screen(screen: &screenshots::Screen) -> Result<CaptureData, String> {
     })
 }
 
-/// 逐屏截屏;坐标换算为逻辑值(物理 / 缩放),供遮罩窗口跨屏定位
+/// 逐屏截屏;坐标换算为逻辑值(物理 / 缩放),供遮罩窗口跨屏定位。
+/// 多屏并行截屏以压缩总耗时。
 fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
     let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
     if screens.is_empty() {
         return Err("未找到可用显示器".into());
     }
-    let mut out = Vec::with_capacity(screens.len());
-    for screen in &screens {
-        let data = capture_screen(screen)?;
-        let scale = f64::from(screen.display_info.scale_factor).max(1.0);
-        out.push(ScreenCapture {
-            data,
-            x: f64::from(screen.display_info.x) / scale,
-            y: f64::from(screen.display_info.y) / scale,
-            w: f64::from(screen.display_info.width) / scale,
-            h: f64::from(screen.display_info.height) / scale,
-        });
-    }
-    Ok(out)
+    let results: Vec<Result<ScreenCapture, String>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = screens
+            .iter()
+            .map(|screen| {
+                scope.spawn(move || {
+                    let data = capture_screen(screen)?;
+                    let scale = f64::from(screen.display_info.scale_factor).max(1.0);
+                    Ok(ScreenCapture {
+                        data,
+                        x: f64::from(screen.display_info.x) / scale,
+                        y: f64::from(screen.display_info.y) / scale,
+                        w: f64::from(screen.display_info.width) / scale,
+                        h: f64::from(screen.display_info.height) / scale,
+                    })
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().map_err(|e| format!("截屏线程崩溃:{e:?}")).and_then(|r| r))
+            .collect()
+    });
+    results.into_iter().collect()
 }
 
 fn close_all_overlays(app: &AppHandle) {
@@ -162,6 +173,7 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
         .resizable(false)
         .always_on_top(true)
         .skip_taskbar(true)
+        .visible(false)
         .background_color(tauri::window::Color(0, 0, 0, 255))
         .position(screen.x, screen.y)
         .inner_size(screen.w, screen.h)
@@ -174,7 +186,7 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
             &app,
             "capture",
             &format!(
-                "遮罩窗 {label} 已创建({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
+                "遮罩窗 {label} 已创建(隐藏,避免开窗展开动画),({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
                 screen.x,
                 screen.y,
                 screen.w,
@@ -186,9 +198,30 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
     log_event(
         &app,
         "capture",
-        &format!("全部遮罩就绪,共 {count} 屏,总耗时 {}ms", t0.elapsed().as_millis()),
+        &format!(
+            "全部遮罩创建完成(隐藏),共 {count} 屏,总耗时 {}ms;待前端就绪后显示",
+            t0.elapsed().as_millis()
+        ),
     );
     Ok(())
+}
+
+/// 遮罩窗内容与位图就绪后由前端调用:显示窗口。隐藏创建 + 就绪后显示,
+/// 可避免 Windows 对"创建即可见"窗口的开窗展开动画(用户反馈的紫色一闪)。
+#[tauri::command]
+async fn show_overlay(app: AppHandle, index: usize) -> Result<(), String> {
+    let label = format!("region-overlay-{index}");
+    match app.get_webview_window(&label) {
+        Some(window) => {
+            window.show().map_err(|e| e.to_string())?;
+            log_event(&app, "capture", &format!("遮罩窗 {label} 已显示(淡入)"));
+            Ok(())
+        }
+        None => {
+            log_event(&app, "capture", &format!("show_overlay:{label} 不存在"));
+            Err(format!("{label} 不存在"))
+        }
+    }
 }
 
 /// 遮罩窗启动时取回自己那一屏的截屏数据(按窗口序号)
@@ -263,7 +296,8 @@ pub fn run() {
             get_capture,
             finish_capture,
             cancel_capture,
-            append_log
+            append_log,
+            show_overlay
         ])
         .run(tauri::generate_context!())
         .expect("QrTool 运行失败");

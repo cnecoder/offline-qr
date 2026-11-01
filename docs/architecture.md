@@ -89,15 +89,17 @@ File / Blob
 ```
 主窗 [屏幕选区] 按钮(仅 __TAURI_INTERNALS__ 存在时显示)
   → invoke start_capture
-      Rust: 逐屏截屏(screenshots crate)→ 每屏 PNG/base64 存入 Mutex<Vec<ScreenCapture>>
+      Rust: 逐屏并行截屏(screenshots crate)→ 每屏 PNG/base64 存入 Mutex<Vec<ScreenCapture>>
             (含该屏逻辑坐标 = 物理 / scale_factor)
-      Rust: 每个显示器创建一个遮罩窗口 region-overlay-<i>(无边框置顶,按逻辑坐标定位)
+      Rust: 每个显示器创建一个遮罩窗口 region-overlay-<i>(无边框置顶,按逻辑坐标定位,
+            以 visible=false 隐藏创建——规避 Windows 开窗展开动画)
 遮罩窗(main.ts 按窗口 label 序号进入 overlay 模式)
   → invoke get_capture(index) → 全屏显示该屏截图 + 十字光标 + 暗化
   → 拖拽出矩形(选区状态机,纯函数)
   → 松手:canvas 按图像像素裁剪 → toDataURL → invoke finish_capture(pngBase64)
   → Esc:invoke cancel_capture
-Rust(finish/cancel):关闭全部遮罩窗;finish 额外 emit "region-captured"(pngBase64)
+  → 位图就绪:invoke show_overlay(index) → 窗口显示 + 180ms 淡入
+Rust(finish/cancel):关闭全部遮罩;finish 额外 emit "region-captured"(pngBase64)
 主窗 listen("region-captured") → base64 → File → 复用 enqueueFiles 识别管线
 ```
 

@@ -159,15 +159,19 @@ async function boot(): Promise<void> {
 
   resize()
 
-  // 位图就绪后淡入:消除触发时的白闪/突现
+  // 位图就绪后:请求 Rust 显示窗口(隐藏创建,无开窗展开动画),再执行 180ms 淡入
   try {
     await image.decode()
     bitmap = await createImageBitmap(image)
-    log('overlay', `截图解码完成,耗时 ${Math.round(performance.now() - t0)}ms,淡入显示`)
+    resize()
+    log('overlay', `截图解码完成,耗时 ${Math.round(performance.now() - t0)}ms,请求显示窗口`)
+    await invoke('show_overlay', { index })
+    requestAnimationFrame(() => root.classList.add('visible'))
   } catch (err) {
-    log('overlay', `截图解码失败:${err instanceof Error ? err.message : String(err)}`)
+    log('overlay', `截图解码/显示失败:${err instanceof Error ? err.message : String(err)}`)
+    // 兜底:无论如何执行淡入,避免遮罩永久不可见
+    requestAnimationFrame(() => root.classList.add('visible'))
   }
-  requestAnimationFrame(() => root.classList.add('visible'))
 }
 
 void boot()
