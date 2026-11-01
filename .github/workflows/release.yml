@@ -82,6 +82,25 @@ jobs:
 
       - name: Upload portable zip to release
         if: matrix.platform == 'windows-latest'
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/QrTool_${{ github.ref_name }}_portable_x64.zip" --clobber
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/QrTool_${VERSION}_portable_x64.zip" --clobber
+
+      - name: Collect failed-step logs
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run view "${{ github.run_id }}" --log-failed > failed-steps.log 2>&1 || true
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ matrix.platform }}
+          path: failed-steps.log
+          retention-days: 14
+          if-no-files-found: ignore
