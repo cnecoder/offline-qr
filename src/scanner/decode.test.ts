@@ -115,7 +115,7 @@ describe('decodePixels(zxing-wasm 真实解码)', () => {
   it(
     '常规文本',
     async () => {
-      const text = 'https://example.com/qr-tool'
+      const text = 'https://example.com/offlineqr'
       const matrix = qrMatrix(text)
       const pixels = matrixToPixels(matrix.size, matrix.data)
       await expect(decodePixels(pixels)).resolves.toEqual([text])

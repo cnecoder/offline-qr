@@ -64,7 +64,7 @@
 - FR-7.7 遮罩淡入呈现(截图位图就绪后 180ms 过渡),无白闪
 
 ### FR-10 诊断日志(桌面版)
-- FR-10.1 前端与 Rust 共用一份本地日志文件(`app_local_data/logs/qr-tool-YYYYMMDD.log`),行格式 `[YYYY-MM-DD HH:MM:SS.mmm][作用域] 消息`,时间戳人类可读且精确到毫秒
+- FR-10.1 前端与 Rust 共用一份本地日志文件(`app_local_data/logs/offlineqr-YYYYMMDD.log`),行格式 `[YYYY-MM-DD HH:MM:SS.mmm][作用域] 消息`,时间戳人类可读且精确到毫秒
 - FR-10.2 覆盖关键链路:屏幕截取全流程、遮罩窗口创建、选区与裁剪、解码耗时与结果、队列状态、历史操作
 - FR-10.3 浏览器形态仅输出 console(无文件);日志写入失败静默降级,不影响功能
 

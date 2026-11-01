@@ -1,5 +1,5 @@
 // 打包 Windows 绿色版(免安装):单 exe + 使用说明 → zip
-// 前置:npm run tauri build 已产出 src-tauri/target/release/{OfflineQR.exe 或 qr-tool.exe}
+// 前置:npm run tauri build 已产出 src-tauri/target/release/OfflineQR.exe
 // 用法:npm run portable
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -14,7 +14,7 @@ const stageDir = join(bundleDir, stageName)
 const zipPath = join(bundleDir, `${stageName}.zip`)
 // tauri build 会把产物改名为 productName;旧工具链产物为 cargo 包名,两者兜底
 const releaseDir = join(ROOT, 'src-tauri', 'target', 'release')
-const srcExe = [join(releaseDir, 'OfflineQR.exe'), join(releaseDir, 'qr-tool.exe')].find(existsSync)
+const srcExe = [join(releaseDir, 'OfflineQR.exe'), join(releaseDir, 'offlineqr.exe'), join(releaseDir, 'qr-tool.exe')].find(existsSync)
 
 const readme = `OfflineQR v${version} 绿色版(免安装)
 ================================
@@ -29,7 +29,7 @@ const readme = `OfflineQR v${version} 绿色版(免安装)
 rmSync(stageDir, { recursive: true, force: true })
 mkdirSync(stageDir, { recursive: true })
 if (!srcExe) {
-  console.error('未找到 release 产物(OfflineQR.exe / qr-tool.exe),请先 npm run tauri build')
+  console.error('未找到 release 产物(OfflineQR.exe),请先 npm run tauri build')
   process.exit(1)
 }
 copyFileSync(srcExe, join(stageDir, 'OfflineQR.exe'))

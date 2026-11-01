@@ -134,7 +134,7 @@ Rust(finish/cancel):关闭全部遮罩;finish 额外 emit "region-captured"(pngB
 
 ### 诊断日志(2026-11-01)
 
-- Rust:日志写入 `%LOCALAPPDATA%/…/app_local_data/logs/qr-tool-YYYYMMDD.log`,
+- Rust:日志写入 `%LOCALAPPDATA%/…/app_local_data/logs/offlineqr-YYYYMMDD.log`,
   行格式 `[YYYY-MM-DD HH:MM:SS.mmm][rust] 消息`;截屏命令全链路埋点
   (显示器枚举、每屏截屏耗时与尺寸、遮罩窗创建、finish/cancel)。
 - 前端:`shared/log.ts` 提供同格式日志(时间戳精确到毫秒),console 输出 + 缓冲批量

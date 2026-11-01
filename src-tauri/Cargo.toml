@@ -1,11 +1,15 @@
 [package]
-name = "qr-tool"
+name = "offlineqr"
 version = "1.2.0"
 description = "完全离线的二维码识别小工具"
 edition = "2021"
 
+[[bin]]
+name = "OfflineQR"
+path = "src/main.rs"
+
 [lib]
-name = "qr_tool_lib"
+name = "offlineqr_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -38,13 +38,13 @@ fn log_file_path(app: &AppHandle) -> Option<PathBuf> {
                 if let Some(dir) = exe.parent() {
                     let candidate = dir.join("logs");
                     if ensure_writable_dir(&candidate) {
-                        return Some(candidate.join(format!("qr-tool-{date}.log")));
+                        return Some(candidate.join(format!("offlineqr-{date}.log")));
                     }
                 }
             }
             let fallback = app.path().app_local_data_dir().ok()?.join("logs");
             std::fs::create_dir_all(&fallback).ok()?;
-            Some(fallback.join(format!("qr-tool-{date}.log")))
+            Some(fallback.join(format!("offlineqr-{date}.log")))
         })
         .clone()
 }

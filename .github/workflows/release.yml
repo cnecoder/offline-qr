@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'QrTool ${{ github.ref_name }}'
+          releaseName: 'OfflineQR ${{ github.ref_name }}'
           releaseBody: '离线二维码识别与生成工具。见 Assets 下载对应平台安装包。'
           releaseDraft: false
           prerelease: false
@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/QrTool_${VERSION}_portable_x64.zip" --clobber
+          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/OfflineQR_${VERSION}_portable_x64.zip" --clobber
 
       - name: Collect failed-step logs
         if: failure()

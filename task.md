@@ -67,6 +67,7 @@
 | 23 | `refactor: standalone clear card` | 清空按钮改独立红色实心卡片:移出功能工具条,同行最右侧等高圆角矩形(danger #FF6B6B + 白字,不随主题),与左侧卡片隔离;二次确认交互不变 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
 | 24 | `feat: frameless rounded window` | 整窗圆角(Win10 无 DWM 圆角):无边框 + 透明窗,网页层画 10px 圆角/描边/阴影,四周 6px 透明边;自绘标题栏(data-tauri-drag-region 拖拽/双击最大化)+ 自绘最小化/最大化/关闭(关闭悬停危险色);构建标记经 build_info 命令移入自绘标题栏;最大化去圆角贴合屏幕;遮罩窗不受影响 | ✘ 已回退(实测不佳,恢复原生边框;实验代码见 6d6bec6/74bb149 与回退提交) |
 | 25 | `chore: rename product OfflineQR` | 工具改名 OfflineQR,界面标题改"极简二维码":productName/identifier(应用数据目录随之更替)、窗口与任务栏标题、index.html 标题与 h1、E2E 标题选择器、绿色版脚本(产物名 OfflineQR.exe,兼容新旧 release 产物名)、Release 工作流名称、README/需求文档命名说明;Cargo/npm 包名保持 qr-tool 不变(debug exe 路径稳定) | ✔ 已完成(98 单测 + 24 E2E 全绿) |
+| 26 | `chore: rename internals to offlineqr` | 对内改名:Cargo 包名 qr-tool → offlineqr、二进制 OfflineQR.exe(debug 与 release 产物名统一)、lib offlineqr_lib、npm 包名 offlineqr(含 lock)、日志文件 offlineqr-YYYYMMDD.log、绿色版/CI 绿色版 zip 名 OfflineQR_*、E2E 样例 URL;旧日志文件保留可回溯 | ✔ 已完成(98 单测 + 24 E2E 全绿) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -175,3 +176,4 @@
 - 2026-11-01 整窗圆角(人工反馈):Win10 无 DWM 圆角,采用无边框 + 透明窗 + 网页层圆角方案(decorations:false / transparent:true);自绘标题栏(拖拽、双击最大化)与最小化/最大化/关闭按钮,构建标记经新增 build_info 命令移入自绘标题栏,任务栏标题保留;最大化时去圆角;遮罩选区窗不受影响。
 - 2026-11-01 **回退:整窗圆角方案实测不佳**,恢复原生边框窗口(代码精确还原至 32a179c);实验实现保留在 6d6bec6/74bb149 与对应回退提交中,后续若重拾可参考。
 - 2026-11-01 **产品改名**(人工反馈):工具名 **OfflineQR**,界面标题 **极简二维码**——productName/identifier/窗口标题/界面/E2E 选择器/绿色版脚本/Release 工作流/README 同步;Cargo 与 npm 包名保持 qr-tool(debug exe 路径稳定)。待办:README 内容整体刷新(仍停留在 v1.0 识别版描述)。
+- 2026-11-01 **对内改名**(人工反馈"对内对外名字全改"):Cargo 包 offlineqr、二进制 **OfflineQR.exe**(debug/release 产物名统一)、lib offlineqr_lib、npm 包 offlineqr、日志文件 offlineqr-YYYYMMDD.log(当日旧 qr-tool-*.log 保留)、绿色版与 CI zip 名 OfflineQR_*;debug exe 路径变为 target/debug/OfflineQR.exe。
