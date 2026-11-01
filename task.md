@@ -55,7 +55,7 @@
 | 11 | `feat: content templates and generation history` | 生成第二批:Wi-Fi/vCard 内容模板(标准格式与转义纯函数)+ 生成历史(结构化条目、恢复表单);闭环 E2E 解码比对 | ✔ 已完成(90 项单测 + 22 项 E2E 全绿) |
 | 12 | `fix: multi-monitor region capture and decode hardening` | 人工反馈两项修复:① 无码图卡"识别中"→ 引擎三重兜底(8s 超时终止重建/onerror 重建/maxNumberOfSymbols 有界);② 屏幕选区仅主屏 → 逐屏截屏+每屏一个遮罩窗(逻辑坐标定位) | ✔ 已完成(92 项单测 + 22 项 E2E 全绿;出 v1.2.0) |
 | 13 | `feat: structured logging` + `fix: region decode diagnostics and fade-in` | 日志系统(Rust 文件日志 + 前端 ms 时间戳日志,统一写入本地文件);屏幕选区淡入 + 裁剪改 ImageBitmap + 全链路诊断日志 | ✔ 已完成 |
-| 14 | `fix: region overlay presentation polish` | 人工反馈:① 遮罩弹出时紫色窗口展开动画 → 遮罩窗以 visible=false 隐藏创建,前端位图就绪后 show_overlay 显示 + 淡入;② 多屏截屏并行化;③ 像素取证发现主窗幽灵副本竞态(hide 异步派发先于截屏)→ 有序确认后再截屏,遮罩黑底不透明仅淡入截图;④ 主窗截屏期间隐藏,避免污染选区画面;⑤ 选区四周自动垫 24px 白色静区 + 失败卡文案引导确认选区完整;⑥ 根因三:带 State 的 async 命令在主线程执行 → run_on_main_thread 自死锁 500ms + 截屏期间 UI 冻结 → 命令改用 app.state 内部访问真正脱离主线程 | ✔ 已完成(92 单测 + 22 E2E 全绿;debug 版可复测) |
+| 14 | `fix: region overlay presentation polish` | 人工反馈:① 遮罩弹出时紫色窗口展开动画 → 遮罩窗以 visible=false 隐藏创建,前端位图就绪后 show_overlay 显示 + 淡入;② 多屏截屏并行化;③ 像素取证发现主窗幽灵副本竞态(hide 异步派发先于截屏)→ 有序确认后再截屏,遮罩黑底不透明仅淡入截图;④ 主窗截屏期间隐藏,避免污染选区画面;⑤ 选区四周自动垫 24px 白色静区 + 失败卡文案引导确认选区完整;⑥ 根因三:带 State 的 async 命令在主线程执行 → run_on_main_thread 自死锁 500ms + 截屏期间 UI 冻结 → 命令改用 app.state 内部访问真正脱离主线程;⑦ 遮罩底图"半透明主窗"残影 → 根因:hide 确认后 0ms 即截屏,GDI BitBlt 取的是 DWM 重新合成前的旧桌面帧 → 隐藏确认后固定等待 150ms(约 9 合成帧)再截屏 | ✔ 已完成(92 单测 + 22 E2E 全绿;debug 版可复测) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -147,3 +147,4 @@
 - 2026-10-31 新增人工测试样张:`scripts/gen-test-fixtures.mjs` + `verify-fixtures.mjs`(13 张样张,引擎回读 QA 全过);AGENTS.md 技术栈描述修正为 zxing-wasm。
 - 2026-10-31 **fix:屏幕选区在主屏死锁**(人工测试发现)——根因:Tauri 在 Windows 上于同步 command 内创建窗口会死锁事件循环;四个截屏命令改为 async,遮罩窗口加黑色底色;出 v1.1.1。
 - 2026-11-01 人工反馈修复:① 无码图卡"识别中"→ 引擎三重兜底(8s 超时终止重建 Worker / onerror 自动重建 / maxNumberOfSymbols=8 有界),92 单测含超时与重建用例;② 屏幕选区仅主屏:逐屏截屏 + 每屏一个遮罩窗(label 序号对应,逻辑坐标定位),全部屏幕均可独立框选。
+- 2026-11-01 **fix:遮罩底图主窗"半透明"残影**(人工反馈复测)——日志时间线证实主窗 hide 成功(10ms 内确认)但随后 0ms 即截屏;GDI 全屏截图取的是 DWM 已合成帧,旧帧仍含主窗,遮罩窗全屏展示该底图时主窗以半透明残影出现(非活窗口)。修复:隐藏确认后固定等待 150ms(约 9 合成帧)再截屏。评估过"最小化"替代方案:SW_MINIMIZE 含 ~200ms DWM 动画,截图必带动画残影,予以否决;采用 Flameshot/Snipaste 同款"隐藏→等合成→截屏"。附带:debug 测试版改为内嵌前端资源构建(`cargo build --features tauri/custom-protocol`),不再依赖 dev server,杜绝"debug 版无法启动(localhost 拒绝连接)"类环境问题。

@@ -82,6 +82,12 @@ struct ScreenCapture {
 #[derive(Default)]
 struct CaptureState(Mutex<Vec<ScreenCapture>>);
 
+/// 隐藏主窗后等待 DWM 重新合成桌面的时长:60Hz 下约 9 帧。
+/// hide() 立即改变窗口标志,但 DWM 在其后的合成帧才把窗口从桌面画面移除,
+/// GDI 全屏截图取的正是已合成帧——不留等待会把主窗截进选区底图,
+/// 遮罩窗展示底图时主窗就以"半透明残影"出现(Flameshot/Snipaste 同样留此等待)。
+const DWM_RECOMPOSE_WAIT: Duration = Duration::from_millis(150);
+
 fn capture_screen(screen: &screenshots::Screen) -> Result<CaptureData, String> {
     let image = screen.capture().map_err(|e| e.to_string())?;
     let (width, height) = (image.width(), image.height());
@@ -177,6 +183,9 @@ async fn start_capture(app: AppHandle) -> Result<(), String> {
     // 先隐藏主窗(主线程同步执行):它不属于可选内容,且避免紫色 UI 出现在选区画面里
     set_main_window_visible(&app, false)?;
     log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
+    // 等待 DWM 把已隐藏的主窗从桌面合成中移除后再截屏,杜绝残影进入底图
+    std::thread::sleep(DWM_RECOMPOSE_WAIT);
+    log_event(&app, "capture", &format!("等待 DWM 重新合成 {}ms,开始截屏", DWM_RECOMPOSE_WAIT.as_millis()));
     let captures = capture_all_screens()?;
     let count = captures.len();
     for (i, sc) in captures.iter().enumerate() {
