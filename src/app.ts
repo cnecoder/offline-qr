@@ -5,7 +5,7 @@ import { initGeneratePanel } from './generator/panel'
 import { createEngine } from './scanner/engine'
 import { createIngest, isImageFile } from './scanner/ingest'
 import { createSerialQueue } from './scanner/queue'
-import { renderResults, selectTextContents, type ResultItem } from './scanner/results'
+import { renderResults, selectTextContents, syncThumbWidths, type ResultItem } from './scanner/results'
 import { log } from './shared/log'
 import { createProgress, hideToast, showToast } from './shared/status'
 import { getTheme, setTheme } from './shared/theme'
@@ -22,6 +22,8 @@ function switchTab(name: string): void {
   }
   ;(document.getElementById('panel-scan') as HTMLElement).hidden = name !== 'scan'
   ;(document.getElementById('panel-generate') as HTMLElement).hidden = name !== 'generate'
+  // 隐藏期间渲染的卡片拿不到高度,切回识别 Tab 时补一次缩略图宽度同步
+  if (name === 'scan') syncThumbWidths(resultsEl)
 }
 for (const button of tabButtons) {
   button.addEventListener('click', () => switchTab(button.dataset.tab ?? 'scan'))
@@ -37,6 +39,7 @@ const progressEl = document.getElementById('progress') as HTMLElement
 const resultsEl = document.getElementById('results') as HTMLElement
 const emptyHint = document.getElementById('empty-hint') as HTMLElement
 const toastEl = document.getElementById('toast') as HTMLElement
+const clearButton = document.getElementById('clear-button') as HTMLButtonElement
 
 const engine = createEngine()
 const ingest = createIngest()
@@ -63,6 +66,7 @@ let toastTimer: number | undefined
 function refresh(): void {
   renderResults(resultsEl, items, { onCopy: handleCopy, latestId: latestDoneId })
   emptyHint.hidden = items.length > 0
+  clearButton.hidden = items.length === 0
 }
 
 function refreshProgress(): void {
@@ -77,6 +81,30 @@ function flashToast(message: string): void {
   window.clearTimeout(toastTimer)
   toastTimer = window.setTimeout(() => hideToast(toastEl), 2000)
 }
+
+// 清空识别记录(工具条右侧):WebView2 无原生 confirm,二次点击确认,3s 未确认自动解除
+let clearArmed = false
+let clearArmTimer: number | undefined
+function disarmClear(): void {
+  clearArmed = false
+  window.clearTimeout(clearArmTimer)
+  clearButton.textContent = '清空'
+  clearButton.classList.remove('danger')
+}
+clearButton.addEventListener('click', () => {
+  if (!clearArmed) {
+    clearArmed = true
+    clearButton.textContent = '再点一次确认清空'
+    clearArmTimer = window.setTimeout(disarmClear, 3000)
+    return
+  }
+  disarmClear()
+  items.length = 0
+  latestDoneId = ''
+  refresh()
+  refreshProgress()
+  flashToast('已清空识别记录')
+})
 
 async function copyToClipboard(text: string): Promise<boolean> {
   if (navigator.clipboard) {

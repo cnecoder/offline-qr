@@ -73,6 +73,17 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     expect(external).toEqual([])
   })
 
+  test('清空识别记录:工具条二次确认后清空卡片区', async ({ page }) => {
+    await pasteImage(page, qrPng(['https://example.com/clear-me']))
+    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/clear-me')
+    await expect(page.getByTestId('clear-button')).toBeVisible()
+    // WebView2 无原生 confirm:二次点击确认
+    await page.getByTestId('clear-button').click()
+    await page.getByTestId('clear-button').click()
+    await expect(page.getByTestId('empty-hint')).toBeVisible()
+    await expect(page.getByTestId('clear-button')).toBeHidden()
+  })
+
   test('配色主题:点击切换 黑绿 ↔ 黑黄 并持久化', async ({ page }) => {
     const html = page.locator('html')
     await expect(html).toHaveAttribute('data-theme', 'black-green')

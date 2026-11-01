@@ -63,6 +63,7 @@
 | 19 | `refactor: card layout alignment` | 三轮卡片布局反馈:① 文本默认单行省略、卡片等高(点击展开/点外收起);② 缩略图垂直居中,上下间距一致;③ 复制按钮等高于文本框;④ meta 行"时间 · 来源 · 最新",徽标殿后,前缀信息跨卡片对齐 | ✔ 已完成(98 单测 + 24 E2E 全绿;待 exe 人工复测) |
 | 20 | `refactor: remove scan history bar` | 三轮人工反馈:① 缩略图改拉伸对齐(上缘贴 meta、下缘贴文本块,cover 轻裁不变形);② 识别 Tab 移除底部"最近识别/清空/历史面板"(结果卡片区即历史,删除 history store 与相关交互,生成 Tab 保留);③ 屏幕选区按钮升级为与选择图片一致的强调色实心 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
 | 21 | `feat: square thumb + source file path` | ① 缩略图拉伸对齐后保持正方形(aspect-ratio:1,宽度随高度);② 文件/拖动来源显示完整源文件路径:WebView2 不向网页暴露路径 → 桌面端文件选择改原生对话框(pick_image_files,tauri-plugin-dialog Rust 侧调用)、拖拽改原生拖放事件(onDragDropEvent,enter/leave 驱动高亮),新增 read_image_files 按路径读图;浏览器端保留 HTML5 流程(仅文件名);meta 行超长路径省略号 + title 悬停全文;scanner/history 恢复为生成历史共享模块 | ✔ 已完成(单测 + 23 E2E 全绿;桌面路径链路待 exe 人工复测) |
+| 22 | `refactor: latest highlight only + clear in toolbar` | ① "最新"徽标移除,仅保留卡片边缘强调色高亮;② 缩略图正方形修复:aspect-ratio 在 flex stretch 下对 img 不传递 → 改外层 div + JS 显式同步宽度=高度(渲染/展开/切 Tab 后触发);③ 清空按钮回归:工具条最右侧(与按钮簇隔离),二次确认,无记录隐藏 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -166,3 +167,4 @@
 - 2026-11-01 卡片四轮布局对齐(人工反馈):文本默认单行省略(卡片等高,点击展开/点外收起);缩略图垂直居中使上下间距一致;复制按钮等高于文本框;meta 行改为"时间 · 来源 · 最新"顺序(徽标殿后,前缀信息跨卡片对齐)。
 - 2026-11-01 界面三轮收尾(人工反馈):缩略图改拉伸对齐(上缘贴 meta、下缘贴文本块);识别 Tab 移除"最近识别"底部条与识别历史存储(history.ts 删除,结果卡片区即历史;生成 Tab"最近生成"保留);屏幕选区按钮与选择图片按钮同为强调色实心。
 - 2026-11-01 缩略图方形 + 源文件路径(人工反馈):拉伸对齐后缩略图以 aspect-ratio:1 保持正方形;文件/拖动来源显示完整路径——WebView2 不向网页暴露路径,桌面端改原生通道(文件选择 = pick_image_files 原生对话框命令,拖拽 = onDragDropEvent 原生事件,新增 tauri-plugin-dialog 依赖与 read_image_files 读图命令),浏览器端保留 HTML5 流程;meta 行路径超长省略 + title 悬停全文。
+- 2026-11-01 卡片五轮微调(人工反馈):"最新"徽标移除仅留边缘高亮;缩略图正方形修复(aspect-ratio 对 flex stretch 的 img 不传递 → 外层 div + JS 同步宽度=高度,展开/切 Tab 后重同步);清空按钮回归至工具条最右侧(二次确认,与卡片历史共存)。

@@ -32,6 +32,16 @@ export function renderResults(
 ): void {
   container.replaceChildren()
   for (const item of items) container.append(renderCard(item, options))
+  syncThumbWidths(container)
+}
+
+/** 缩略图宽度跟随高度保持正方形(高度由内容区拉伸决定;aspect-ratio 在 flex stretch 下对 img 不传递) */
+export function syncThumbWidths(root: HTMLElement | null): void {
+  if (!root) return
+  for (const el of root.querySelectorAll<HTMLElement>('.thumb')) {
+    const h = Math.round(el.getBoundingClientRect().height)
+    if (h > 0) el.style.width = `${h}px`
+  }
 }
 
 export function renderCard(item: ResultItem, options: ResultRenderOptions = {}): HTMLElement {
@@ -42,11 +52,14 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   card.dataset.testid = `result-card-${item.id}`
 
   if (item.thumb) {
+    const box = document.createElement('div')
+    box.className = 'thumb'
     const img = document.createElement('img')
-    img.className = 'thumb'
+    img.className = 'thumb-img'
     img.alt = item.name
     img.src = item.thumb
-    card.append(img)
+    box.append(img)
+    card.append(box)
   }
 
   const body = document.createElement('div')
@@ -54,7 +67,7 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else {
-    // meta 行:时间在前、来源居中、源文件路径随后,"最新"徽标殿后——各卡片前缀信息保持对齐
+    // meta 行:时间在前、来源居中、源文件路径随后——各卡片前缀信息保持对齐
     const meta = document.createElement('div')
     meta.className = 'card-meta'
     if (item.completedAt || item.source || item.filePath) {
@@ -70,7 +83,6 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
       stamp.title = stamp.textContent
       meta.append(stamp)
     }
-    if (isLatest) meta.append(latestChip())
     if (meta.childElementCount > 0) body.append(meta)
 
     if (item.state === 'failed') {
@@ -118,6 +130,8 @@ function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   pre.addEventListener('click', () => {
     pre.classList.remove('collapsed')
     pre.classList.add('expanded')
+    // 展开改变卡片高度,缩略图宽度需重新同步
+    syncThumbWidths(pre.closest('.results'))
   })
   row.append(pre)
 
@@ -131,13 +145,6 @@ function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   actions.append(copy)
   row.append(actions)
   return row
-}
-
-function latestChip(): HTMLElement {
-  const chip = document.createElement('span')
-  chip.className = 'latest-chip'
-  chip.textContent = '最新'
-  return chip
 }
 
 function message(text: string): HTMLElement {

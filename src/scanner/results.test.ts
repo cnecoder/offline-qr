@@ -40,17 +40,16 @@ describe('renderCard', () => {
     expect(card.querySelector('.card-msg')?.textContent).toBe('识别异常:识别引擎异常终止')
   })
 
-  it('done 卡:meta 行 时间在前、来源在后、"最新"徽标殿后', () => {
+  it('done 卡:meta 行 时间在前、来源在后;"最新"仅卡片高亮,无徽标', () => {
     const card = renderCard(
       item({ source: '屏幕选区', completedAt: new Date(2026, 10, 1, 18, 23, 45).getTime() }),
       { latestId: 't1' },
     )
     const meta = card.querySelector('.card-meta')!
     const text = meta.textContent ?? ''
-    expect(text).toContain('2026-11-01 18:23:45')
-    expect(text).toContain('屏幕选区')
     expect(text.indexOf('2026-11-01 18:23:45')).toBeLessThan(text.indexOf('屏幕选区'))
-    expect(meta.lastElementChild?.className).toBe('latest-chip')
+    expect(meta.querySelector('.latest-chip')).toBeNull()
+    expect(card.classList.contains('latest')).toBe(true)
   })
 
   it('done 卡:文本默认单行(卡片等高)', () => {
