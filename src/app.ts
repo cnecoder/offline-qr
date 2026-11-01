@@ -82,14 +82,13 @@ function flashToast(message: string): void {
   toastTimer = window.setTimeout(() => hideToast(toastEl), 2000)
 }
 
-// 清空识别记录(工具条右侧):WebView2 无原生 confirm,二次点击确认,3s 未确认自动解除
+// 清空识别记录(独立红色卡片):WebView2 无原生 confirm,二次点击确认,3s 未确认自动解除
 let clearArmed = false
 let clearArmTimer: number | undefined
 function disarmClear(): void {
   clearArmed = false
   window.clearTimeout(clearArmTimer)
   clearButton.textContent = '清空'
-  clearButton.classList.remove('danger')
 }
 clearButton.addEventListener('click', () => {
   if (!clearArmed) {

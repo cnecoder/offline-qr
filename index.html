@@ -44,13 +44,15 @@
 
       <!-- 识别面板 -->
       <div id="panel-scan" class="panel" data-testid="panel-scan">
-        <section id="dropzone" class="toolbar" data-testid="dropzone">
-          <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
-          <button id="region-button" class="primary" data-testid="region-button" hidden>屏幕选区</button>
-          <span class="toolbar-hint">拖拽 / Ctrl+V 粘贴 / 全局 Alt+Q 屏幕选区</span>
-          <button id="clear-button" class="link-button danger" data-testid="clear-button" hidden>清空</button>
-          <input id="file-input" type="file" accept="image/*" multiple hidden />
-        </section>
+        <div class="toolbar-row">
+          <section id="dropzone" class="toolbar" data-testid="dropzone">
+            <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
+            <button id="region-button" class="primary" data-testid="region-button" hidden>屏幕选区</button>
+            <span class="toolbar-hint">拖拽 / Ctrl+V 粘贴 / 全局 Alt+Q 屏幕选区</span>
+            <input id="file-input" type="file" accept="image/*" multiple hidden />
+          </section>
+          <button id="clear-button" class="clear-button" data-testid="clear-button" hidden>清空</button>
+        </div>
 
         <p id="progress" class="progress" data-testid="progress" hidden></p>
 
