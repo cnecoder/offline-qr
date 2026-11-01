@@ -8,6 +8,7 @@ use base64::Engine as _;
 use chrono::Local as LocalTime;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, Shortcut, ShortcutState};
 
 static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
 
@@ -173,6 +174,21 @@ fn close_all_overlays(app: &AppHandle) {
     }
 }
 
+/// 全局快捷键:显示/隐藏主窗(显隐必须主线程执行,与 set_main_window_visible 同款约束)
+fn toggle_main_window(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window("main") {
+            let visible = window.is_visible().unwrap_or(false);
+            let result = if visible { window.hide() } else { window.show() };
+            match result {
+                Ok(_) => log_event(&handle, "hotkey", &format!("快捷键切换主窗{}", if visible { "隐藏" } else { "显示" })),
+                Err(e) => log_event(&handle, "hotkey", &format!("快捷键切换主窗失败:{e}")),
+            }
+        }
+    });
+}
+
 /// 逐屏截屏 → 存状态 → 每个显示器开一个遮罩窗口(均可独立框选)。
 /// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
 /// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
@@ -321,6 +337,28 @@ async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(CaptureState::default())
+        .plugin(
+            GlobalShortcutBuilder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let region = "alt+q".parse::<Shortcut>().unwrap();
+                    let toggle = "alt+w".parse::<Shortcut>().unwrap();
+                    let app = app.clone();
+                    if shortcut == &region {
+                        tauri::async_runtime::spawn(async move {
+                            log_event(&app, "hotkey", "全局快捷键 Alt+Q 触发屏幕选区");
+                            if let Err(e) = start_capture(app.clone()).await {
+                                log_event(&app, "hotkey", &format!("快捷键发起选区失败:{e}"));
+                            }
+                        });
+                    } else if shortcut == &toggle {
+                        toggle_main_window(&app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             let handle = app.handle().clone();
 
@@ -359,6 +397,13 @@ pub fn run() {
                         .unwrap_or_else(|| "不可用".into())
                 ),
             );
+            // 全局快捷键:Alt+Q 屏幕选区识别,Alt+W 显示/隐藏主窗(冲突时降级为仅应用内可用)
+            for (combo, desc) in [("alt+q", "屏幕选区识别"), ("alt+w", "显示/隐藏主窗")] {
+                match handle.global_shortcut().register(combo) {
+                    Ok(_) => log_event(&handle, "hotkey", &format!("已注册全局快捷键 {combo}({desc})")),
+                    Err(e) => log_event(&handle, "hotkey", &format!("注册全局快捷键 {combo}({desc})失败,可能被其他程序占用:{e}")),
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
