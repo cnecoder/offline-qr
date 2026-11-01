@@ -15,18 +15,10 @@ describe('renderCard', () => {
     expect(card.querySelector('[data-testid="copy-button"]')).toBeTruthy()
   })
 
-  it('URL 文本出现"打开链接"且安全属性齐全', () => {
-    const link = renderCard(item({ texts: ['https://example.com'] })).querySelector<HTMLAnchorElement>(
-      '[data-testid="open-link"]',
-    )
-    expect(link?.getAttribute('href')).toBe('https://example.com')
-    expect(link?.target).toBe('_blank')
-    expect(link?.rel).toContain('noopener')
-  })
-
-  it('普通文本不出现"打开链接"', () => {
-    const card = renderCard(item({ texts: ['just text'] }))
+  it('结果卡仅提供复制按钮,不再提供"打开链接"', () => {
+    const card = renderCard(item({ texts: ['https://example.com'] }))
     expect(card.querySelector('[data-testid="open-link"]')).toBeNull()
+    expect(card.querySelector('[data-testid="copy-button"]')).toBeTruthy()
   })
 
   it('一图多码渲染多条文本,各带复制按钮', () => {

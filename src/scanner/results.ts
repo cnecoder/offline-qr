@@ -1,5 +1,3 @@
-import { isHttpUrl } from '../shared/url'
-
 export type ResultState = 'pending' | 'done' | 'failed'
 
 export interface ResultItem {
@@ -92,16 +90,6 @@ function textBlock(text: string, handlers: ResultHandlers): HTMLElement {
   copy.dataset.testid = 'copy-button'
   copy.addEventListener('click', () => handlers.onCopy?.(text))
   actions.append(copy)
-
-  if (isHttpUrl(text)) {
-    const open = document.createElement('a')
-    open.textContent = '打开链接'
-    open.href = text
-    open.target = '_blank'
-    open.rel = 'noopener noreferrer'
-    open.dataset.testid = 'open-link'
-    actions.append(open)
-  }
 
   wrap.append(actions)
   return wrap
