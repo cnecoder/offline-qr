@@ -68,12 +68,14 @@
 | 24 | `feat: frameless rounded window` | 整窗圆角(Win10 无 DWM 圆角):无边框 + 透明窗,网页层画 10px 圆角/描边/阴影,四周 6px 透明边;自绘标题栏(data-tauri-drag-region 拖拽/双击最大化)+ 自绘最小化/最大化/关闭(关闭悬停危险色);构建标记经 build_info 命令移入自绘标题栏;最大化去圆角贴合屏幕;遮罩窗不受影响 | ✘ 已回退(实测不佳,恢复原生边框;实验代码见 6d6bec6/74bb149 与回退提交) |
 | 25 | `chore: rename product OfflineQR` | 工具改名 OfflineQR,界面标题改"极简二维码":productName/identifier(应用数据目录随之更替)、窗口与任务栏标题、index.html 标题与 h1、E2E 标题选择器、绿色版脚本(产物名 OfflineQR.exe,兼容新旧 release 产物名)、Release 工作流名称、README/需求文档命名说明;Cargo/npm 包名保持 qr-tool 不变(debug exe 路径稳定) | ✔ 已完成(98 单测 + 24 E2E 全绿) |
 | 26 | `chore: rename internals to offlineqr` | 对内改名:Cargo 包名 qr-tool → offlineqr、二进制 OfflineQR.exe(debug 与 release 产物名统一)、lib offlineqr_lib、npm 包名 offlineqr(含 lock)、日志文件 offlineqr-YYYYMMDD.log、绿色版/CI 绿色版 zip 名 OfflineQR_*、E2E 样例 URL;旧日志文件保留可回溯 | ✔ 已完成(98 单测 + 24 E2E 全绿) |
+| 27 | `chore: OfflineQRScanner product identity` | 本分支产品名 OfflineQRScanner(带版本号):productName/bin/identifier(com.offlineqr.scanner,独立数据目录)、标题栏显示 v1.2.0、绿色版/CI zip 名同步;移除遗留的"识别/生成"Tab 导航(样式已随生成剥离,导航块漏删) | ✔ 已完成(单测 + 构建全绿;待 exe 人工复测) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
 ## 分支策略(2026-10-30 起)
 
 > **本分支(`recognition`)为仅识别精简线**(2026-11-01 起):包含全部识别侧改进(卡片体系/主题/全局快捷键/源文件路径/屏幕选区修复),已剥离生成模块与生成历史;完整功能线见 `recognition-generation`。
+> 本分支产品名:**OfflineQRScanner**(区别于全功能线的 OfflineQR),应用数据目录独立(com.offlineqr.scanner)。
 
 - **`v1.0.0` tag**:识别功能完整基线(图片识别 + 屏幕选区 + 历史;56 单测 + 9 E2E)
 - **`recognition` 分支**:只有识别功能,**识别独立迭代线**——识别相关修复与体验优化在此进行并独立发布

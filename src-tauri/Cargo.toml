@@ -5,7 +5,7 @@ description = "完全离线的二维码识别小工具"
 edition = "2021"
 
 [[bin]]
-name = "OfflineQR"
+name = "OfflineQRScanner"
 path = "src/main.rs"
 
 [lib]

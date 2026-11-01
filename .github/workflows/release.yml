@@ -87,7 +87,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/OfflineQR_${VERSION}_portable_x64.zip" --clobber
+          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/OfflineQRScanner_${VERSION}_portable_x64.zip" --clobber
 
       - name: Collect failed-step logs
         if: failure()

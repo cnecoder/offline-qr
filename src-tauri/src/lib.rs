@@ -440,7 +440,10 @@ pub fn run() {
                 })
                 .unwrap_or_else(|| "?".into());
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_title(&format!("极简二维码 [构建 {build_label} · exe {exe_meta}]"));
+                let _ = window.set_title(&format!(
+                    "极简二维码 v{} [构建 {build_label} · exe {exe_meta}]",
+                    app.package_info().version
+                ));
             }
             log_event(
                 &handle,
