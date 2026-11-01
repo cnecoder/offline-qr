@@ -216,7 +216,6 @@ button.primary:hover {
   border-radius: 999px;
   color: var(--accent);
   background: var(--accent-weak);
-  margin-bottom: 4px;
 }
 .thumb {
   width: 44px;
@@ -226,18 +225,35 @@ button.primary:hover {
   background: var(--surface-2);
   flex-shrink: 0;
 }
-.card-body { flex: 1; min-width: 0; }
-/* 单条文本行:独立底色的文本块 + 右侧 全选/复制 按钮列 */
-.result-row {
+.card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+/* meta 行:"最新"徽标 + 来源与完成时间 */
+.card-meta {
   display: flex;
   align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+/* 单条文本行:撑满卡片高度的独立底色文本块 + 右侧复制按钮 */
+.result-row {
+  display: flex;
+  align-items: stretch;
   gap: 8px;
 }
-.result-row + .result-row { margin-top: 6px; }
 .result-text {
   flex: 1;
   min-width: 0;
   margin: 0;
+  display: flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-size: 13px;
   word-break: break-all;
@@ -258,6 +274,7 @@ button.primary:hover {
 .row-actions {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 4px;
   flex-shrink: 0;
 }

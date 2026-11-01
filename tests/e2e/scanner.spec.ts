@@ -109,14 +109,15 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(html).toHaveAttribute('data-theme', 'black-green')
   })
 
-  test('结果卡片:全选按钮选中文本,复制按钮右置', async ({ page }) => {
-    await pasteImage(page, qrPng(['https://example.com/select-all']))
-    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/select-all')
-    await page.getByTestId('select-button').click()
+  test('结果卡片:识别完成自动全选,标注来源与精确时间', async ({ page }) => {
+    await pasteImage(page, qrPng(['https://example.com/auto-select']))
+    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/auto-select')
+    // 识别完成默认全选文本块,可直接 Ctrl+C
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
-    expect(selected).toBe('https://example.com/select-all')
-    await expect(page.getByTestId('copy-button')).toBeVisible()
+    expect(selected).toBe('https://example.com/auto-select')
     await expect(page.locator('.result-card.latest')).toHaveCount(1)
+    // meta 行:来源(粘贴)+ 年月日 时:分:秒
+    await expect(page.locator('.card-meta').first()).toHaveText(/粘贴 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   })
 })
 

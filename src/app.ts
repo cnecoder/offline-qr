@@ -5,7 +5,7 @@ import { createEngine } from './scanner/engine'
 import { createHistoryStore } from './scanner/history'
 import { createIngest, isImageFile } from './scanner/ingest'
 import { createSerialQueue } from './scanner/queue'
-import { renderResults, type ResultItem } from './scanner/results'
+import { renderResults, selectTextContents, type ResultItem } from './scanner/results'
 import { log } from './shared/log'
 import { createProgress, hideToast, showToast } from './shared/status'
 import { getTheme, setTheme } from './shared/theme'
@@ -131,6 +131,13 @@ async function decodeItem(uid: string, file: File): Promise<void> {
     if (target) {
       target.state = texts.length > 0 ? 'done' : 'failed'
       target.texts = texts
+      target.completedAt = Date.now()
+      // 最新完成的卡片移到最前
+      const idx = items.indexOf(target)
+      if (idx > 0) {
+        items.splice(idx, 1)
+        items.unshift(target)
+      }
     }
     latestDoneId = uid
     log('scan', `解码完成 ${Math.round(performance.now() - t0)}ms,结果 ${texts.length} 条`)
@@ -144,6 +151,12 @@ async function decodeItem(uid: string, file: File): Promise<void> {
     if (target) {
       target.state = 'failed'
       target.error = err instanceof Error ? err.message : String(err)
+      target.completedAt = Date.now()
+      const idx = items.indexOf(target)
+      if (idx > 0) {
+        items.splice(idx, 1)
+        items.unshift(target)
+      }
     }
     latestDoneId = uid
     log('scan', `识别失败:${err instanceof Error ? err.message : String(err)}`)
@@ -160,9 +173,14 @@ async function decodeItem(uid: string, file: File): Promise<void> {
   }
   refresh()
   refreshProgress()
+  // 识别成功后默认全选文本块,可直接 Ctrl+C 或点右侧复制
+  if (target && target.state === 'done') {
+    const el = resultsEl.querySelector<HTMLElement>('.result-card.latest .result-text')
+    if (el) selectTextContents(el)
+  }
 }
 
-function enqueueFiles(files: ArrayLike<File>): void {
+function enqueueFiles(files: ArrayLike<File>, source: string): void {
   const all = Array.from(files)
   const images = all.filter(isImageFile)
   if (images.length === 0) {
@@ -170,10 +188,10 @@ function enqueueFiles(files: ArrayLike<File>): void {
     log('scan', `入队忽略:${all.length} 个文件均非图片`)
     return
   }
-  log('scan', `入队 ${images.length} 张图片(忽略非图片 ${all.length - images.length} 个)`)
+  log('scan', `入队 ${images.length} 张图片,来源 ${source}(忽略非图片 ${all.length - images.length} 个)`)
   for (const file of images) {
     const uid = `item-${++uidCounter}`
-    items.push({ id: uid, name: file.name, thumb: '', state: 'pending', texts: [] })
+    items.push({ id: uid, name: file.name, thumb: '', state: 'pending', texts: [], source })
     refresh()
     void queue.add(() => decodeItem(uid, file))
   }
@@ -183,7 +201,7 @@ function enqueueFiles(files: ArrayLike<File>): void {
 // 输入路径 1:文件选择(可多选)
 pickButton.addEventListener('click', () => fileInput.click())
 fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length > 0) enqueueFiles(fileInput.files)
+  if (fileInput.files && fileInput.files.length > 0) enqueueFiles(fileInput.files, '文件')
   fileInput.value = ''
 })
 
@@ -200,7 +218,7 @@ window.addEventListener('dragleave', (event: DragEvent) => {
 window.addEventListener('drop', (event: DragEvent) => {
   event.preventDefault()
   appRoot.classList.remove('dragging')
-  if (event.dataTransfer?.files.length) enqueueFiles(event.dataTransfer.files)
+  if (event.dataTransfer?.files.length) enqueueFiles(event.dataTransfer.files, '拖动')
 })
 
 // 输入路径 3:粘贴截图
@@ -215,7 +233,7 @@ document.addEventListener('paste', (event: ClipboardEvent) => {
   }
   if (files.length > 0) {
     event.preventDefault()
-    enqueueFiles(files)
+    enqueueFiles(files, '粘贴')
   }
 })
 
@@ -237,7 +255,7 @@ if (isTauri) {
     const bin = atob(event.payload)
     const bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-    enqueueFiles([new File([bytes], '屏幕选区.png', { type: 'image/png' })])
+    enqueueFiles([new File([bytes], '屏幕选区.png', { type: 'image/png' })], '屏幕选区')
   })
 }
 
@@ -287,6 +305,8 @@ function recallEntry(text: string): void {
     thumb: '',
     state: 'done',
     texts: [text],
+    source: '历史回显',
+    completedAt: Date.now(),
   })
   refresh()
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })

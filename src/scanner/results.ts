@@ -9,6 +9,10 @@ export interface ResultItem {
   texts: string[]
   /** state=failed 时的真实原因(引擎异常等);缺省 = 解码正常但未发现二维码 */
   error?: string
+  /** 识别来源:屏幕选区 / 文件 / 拖动 / 粘贴 / 历史回显 */
+  source?: string
+  /** 完成识别的时间戳(用于卡片标注日期时间) */
+  completedAt?: number
 }
 
 export interface ResultRenderOptions {
@@ -48,7 +52,21 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else {
-    if (isLatest) body.append(latestChip())
+    // meta 行:"最新"徽标 + 来源与完成时间(年月日 时:分:秒)
+    const meta = document.createElement('div')
+    meta.className = 'card-meta'
+    if (isLatest) meta.append(latestChip())
+    if (item.completedAt) {
+      const stamp = document.createElement('span')
+      stamp.textContent = [item.source, formatDateTime(item.completedAt)].filter(Boolean).join(' · ')
+      meta.append(stamp)
+    } else if (item.source) {
+      const stamp = document.createElement('span')
+      stamp.textContent = item.source
+      meta.append(stamp)
+    }
+    if (meta.childElementCount > 0) body.append(meta)
+
     if (item.state === 'failed') {
       // 引擎异常时直接给出真实原因,避免误导用户去检查选区完整性
       body.append(
@@ -66,8 +84,8 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   return card
 }
 
-/** 点击"全选":选中文本块全部内容,可直接 Ctrl+C */
-function selectContents(el: HTMLElement): void {
+/** 选中文本块全部内容(供"识别完成默认全选"复用;用户仍可鼠标部分选择) */
+export function selectTextContents(el: HTMLElement): void {
   const range = document.createRange()
   range.selectNodeContents(el)
   const selection = window.getSelection()
@@ -76,7 +94,7 @@ function selectContents(el: HTMLElement): void {
   selection.addRange(range)
 }
 
-/** 单条文本行:文本块(独立底色,明确区分)+ 右侧 全选/复制 按钮列 */
+/** 单条文本行:撑满卡片高度的文本块 + 右侧复制按钮 */
 function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   const row = document.createElement('div')
   row.className = 'result-row'
@@ -87,22 +105,19 @@ function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   pre.textContent = text
   if (text.length > COLLAPSE_LENGTH || text.includes('\n')) {
     pre.classList.add('collapsed')
-    pre.addEventListener('click', () => pre.classList.toggle('collapsed'))
+    // 单向展开:松手选区不触发再折叠,避免与拖选冲突
+    pre.addEventListener('click', () => pre.classList.remove('collapsed'))
   }
   row.append(pre)
 
   const actions = document.createElement('div')
   actions.className = 'row-actions'
-  const selectAll = document.createElement('button')
-  selectAll.textContent = '全选'
-  selectAll.dataset.testid = 'select-button'
-  selectAll.addEventListener('click', () => selectContents(pre))
   const copy = document.createElement('button')
   copy.textContent = '复制'
   copy.className = 'copy-button'
   copy.dataset.testid = 'copy-button'
   copy.addEventListener('click', () => options.onCopy?.(text))
-  actions.append(selectAll, copy)
+  actions.append(copy)
   row.append(actions)
   return row
 }
@@ -119,6 +134,14 @@ function message(text: string): HTMLElement {
   p.className = 'card-msg'
   p.textContent = text
   return p
+}
+
+const pad = (n: number): string => String(n).padStart(2, '0')
+
+/** 年-月-日 时:分:秒(本地时区) */
+export function formatDateTime(ts: number): string {
+  const d = new Date(ts)
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
 /** 超过该长度或含换行的文本默认折叠,点击展开 */
