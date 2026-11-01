@@ -69,6 +69,40 @@ describe('renderCard', () => {
     expect(pre.classList.contains('collapsed')).toBe(false)
   })
 
+  it('长文本展开后,点击文本块外任意位置收起', () => {
+    const card = renderCard(item({ texts: ['y'.repeat(200)] }))
+    document.body.append(card)
+    const pre = card.querySelector('.result-text')!
+    pre.dispatchEvent(new Event('click'))
+    expect(pre.classList.contains('expanded')).toBe(true)
+    const outside = document.createElement('div')
+    document.body.append(outside)
+    outside.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    expect(pre.classList.contains('expanded')).toBe(false)
+    expect(pre.classList.contains('collapsed')).toBe(true)
+    card.remove()
+    outside.remove()
+  })
+
+  it('Ctrl+A:光标在文本块内时只选中该块内容', () => {
+    const card = renderCard(item({ texts: ['want this only'] }))
+    document.body.append(card)
+    const pre = card.querySelector('.result-text')!
+    const selection = window.getSelection()!
+    // 光标落在文本块内(塌陷选区,当前无选中内容)
+    const caret = document.createRange()
+    caret.setStart(pre.firstChild!, 0)
+    caret.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(caret)
+    expect(selection.toString()).toBe('')
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true, cancelable: true }),
+    )
+    expect(selection.toString()).toBe('want this only')
+    card.remove()
+  })
+
   it('点击复制按钮触发 onCopy 并携带文本', () => {
     const onCopy = vi.fn()
     const card = renderCard(item({ texts: ['want this'] }), { onCopy })

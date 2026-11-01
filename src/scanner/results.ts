@@ -105,8 +105,11 @@ function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   pre.textContent = text
   if (text.length > COLLAPSE_LENGTH || text.includes('\n')) {
     pre.classList.add('collapsed')
-    // 单向展开:松手选区不触发再折叠,避免与拖选冲突
-    pre.addEventListener('click', () => pre.classList.remove('collapsed'))
+    // 点击展开;点击文本块外任意位置收起(统一绑定,见 bindTextInteractions)
+    pre.addEventListener('click', () => {
+      pre.classList.remove('collapsed')
+      pre.classList.add('expanded')
+    })
   }
   row.append(pre)
 
@@ -144,5 +147,41 @@ export function formatDateTime(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
+/**
+ * 文本块全局交互(幂等绑定):
+ * 1. 点击文本块外任意位置 → 收起已展开的长文本(回到两行钳制);
+ * 2. Ctrl+A(⌘A)时光标在文本块内 → 只选中该块内容,屏蔽整页全选。
+ */
+let interactionsBound = false
+function bindTextInteractions(): void {
+  if (interactionsBound) return
+  interactionsBound = true
+  document.addEventListener('pointerdown', event => {
+    const node = event.target as Node | null
+    document.querySelectorAll<HTMLElement>('.result-text.expanded').forEach(el => {
+      if (node === null || !el.contains(node)) {
+        el.classList.remove('expanded')
+        el.classList.add('collapsed')
+      }
+    })
+  })
+  document.addEventListener(
+    'keydown',
+    event => {
+      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a') return
+      const anchor = window.getSelection()?.anchorNode ?? null
+      const start: Element | null = anchor instanceof Element ? anchor : (anchor?.parentElement ?? null)
+      const block = start?.closest<HTMLElement>('.result-text') ?? null
+      if (!block) return
+      event.preventDefault()
+      selectTextContents(block)
+    },
+    true,
+  )
+}
+
 /** 超过该长度或含换行的文本默认折叠,点击展开 */
 const COLLAPSE_LENGTH = 80
+
+// 模块加载即绑定(幂等):应用与测试环境行为一致
+bindTextInteractions()

@@ -271,6 +271,7 @@ button.primary:hover {
   overflow: hidden;
   cursor: pointer;
 }
+.result-text.expanded { display: flex; }
 .row-actions {
   display: flex;
   flex-direction: column;
