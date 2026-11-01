@@ -156,6 +156,14 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
     log_event(&app, "capture", "开始屏幕截取");
     // 先隐藏主窗:它不属于可选内容,且避免紫色 UI 出现在选区画面里
     set_main_window_visible(&app, false);
+    // hide 是异步派发的:等主窗真正从屏幕上消失再截屏,否则截图会带上主窗"幽灵副本"
+    for _ in 0..20 {
+        match app.get_webview_window("main").map(|w| w.is_visible()) {
+            Some(Ok(false)) => break,
+            _ => std::thread::sleep(std::time::Duration::from_millis(25)),
+        }
+    }
+    log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
     let captures = capture_all_screens()?;
     let count = captures.len();
     for (i, sc) in captures.iter().enumerate() {

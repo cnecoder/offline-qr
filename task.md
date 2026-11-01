@@ -55,7 +55,7 @@
 | 11 | `feat: content templates and generation history` | 生成第二批:Wi-Fi/vCard 内容模板(标准格式与转义纯函数)+ 生成历史(结构化条目、恢复表单);闭环 E2E 解码比对 | ✔ 已完成(90 项单测 + 22 项 E2E 全绿) |
 | 12 | `fix: multi-monitor region capture and decode hardening` | 人工反馈两项修复:① 无码图卡"识别中"→ 引擎三重兜底(8s 超时终止重建/onerror 重建/maxNumberOfSymbols 有界);② 屏幕选区仅主屏 → 逐屏截屏+每屏一个遮罩窗(逻辑坐标定位) | ✔ 已完成(92 项单测 + 22 项 E2E 全绿;出 v1.2.0) |
 | 13 | `feat: structured logging` + `fix: region decode diagnostics and fade-in` | 日志系统(Rust 文件日志 + 前端 ms 时间戳日志,统一写入本地文件);屏幕选区淡入 + 裁剪改 ImageBitmap + 全链路诊断日志 | ✔ 已完成 |
-| 14 | `fix: region overlay presentation polish` | 人工反馈:① 遮罩弹出时紫色窗口展开动画 → 遮罩窗以 visible=false 隐藏创建,前端位图就绪后 show_overlay 显示 + 淡入;② 多屏截屏并行化压缩耗时;debug 版启动遮罩较慢为未优化编译 + dev server 特性 | ✔ 已完成(定向测试通过;debug 版可复测) |
+| 14 | `fix: region overlay presentation polish` | 人工反馈:① 遮罩弹出时紫色窗口展开动画 → 遮罩窗以 visible=false 隐藏创建,前端位图就绪后 show_overlay 显示 + 淡入;② 多屏截屏并行化;③ 像素取证发现主窗"幽灵副本"竞态(hide 异步派发先于截屏)→ hide 后轮询确认再截屏,遮罩黑底不透明仅淡入截图;④ 主窗截屏期间隐藏,避免污染选区画面 | ✔ 已完成(定向测试通过;debug 版可复测) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 

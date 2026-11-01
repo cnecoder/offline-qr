@@ -263,10 +263,17 @@ button.primary:hover { opacity: 0.92; color: #fff; }
   background: #000;
   color: #fff;
   font-size: 14px;
+}
+/* 黑色底全程不透明,只淡入截图内容——避免与真实桌面交叉淡化产生闪现 */
+.overlay-image,
+.overlay-canvas {
   opacity: 0;
   transition: opacity 0.18s ease-out;
 }
-.overlay.visible { opacity: 1; }
+.overlay.visible .overlay-image,
+.overlay.visible .overlay-canvas {
+  opacity: 1;
+}
 .overlay-image {
   position: absolute;
   inset: 0;
