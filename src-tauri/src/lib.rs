@@ -440,7 +440,7 @@ pub fn run() {
                 })
                 .unwrap_or_else(|| "?".into());
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_title(&format!("二维码识别 [构建 {build_label} · exe {exe_meta}]"));
+                let _ = window.set_title(&format!("极简二维码 [构建 {build_label} · exe {exe_meta}]"));
             }
             log_event(
                 &handle,
@@ -473,5 +473,5 @@ pub fn run() {
             read_image_files
         ])
         .run(tauri::generate_context!())
-        .expect("QrTool 运行失败");
+        .expect("OfflineQR 运行失败");
 }

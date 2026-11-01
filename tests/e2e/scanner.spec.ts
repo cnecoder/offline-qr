@@ -5,10 +5,10 @@ import { pasteImage, qrPng, solidPng } from './helpers'
 
 const RESULT_TEXT = '[data-testid="result-text"]'
 
-test.describe('二维码识别 · E2E(localhost)', () => {
+test.describe('极简二维码 · E2E(localhost)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: '二维码识别' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '极简二维码' })).toBeVisible()
   })
 
   test('页面加载:空态与关键元素齐全', async ({ page }) => {
@@ -107,13 +107,13 @@ test.describe('二维码识别 · E2E(localhost)', () => {
   })
 })
 
-test.describe('二维码识别 · E2E(file:// 直开单文件产物)', () => {
+test.describe('极简二维码 · E2E(file:// 直开单文件产物)', () => {
   test('无需服务器:WASM 与 Worker 内联在 file:// 下完整工作', async ({ browser }) => {
     const fileUrl = pathToFileURL(path.resolve('./dist/index.html')).href
     const context = await browser.newContext()
     const page = await context.newPage()
     await page.goto(fileUrl)
-    await expect(page.getByRole('heading', { name: '二维码识别' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '极简二维码' })).toBeVisible()
     await pasteImage(page, qrPng(['https://example.com/file-uri']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/file-uri', {
       timeout: 15_000,
