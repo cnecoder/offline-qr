@@ -180,6 +180,8 @@ export function initGeneratePanel(): void {
         applyContent(entry.content)
         render()
         showStatus('已恢复该次生成内容')
+        historyOpen = false
+        renderGenHistory()
       })
       historyList.append(li)
     }
@@ -214,6 +216,14 @@ export function initGeneratePanel(): void {
     }
     disarmGenClear()
     genHistory.clear()
+    renderGenHistory()
+  })
+  // 点击面板外部任意处自动收起生成历史面板
+  document.addEventListener('pointerdown', event => {
+    if (!historyOpen) return
+    const node = event.target as Node
+    if (historyList.contains(node) || historyToggle.contains(node) || historyClear.contains(node)) return
+    historyOpen = false
     renderGenHistory()
   })
 

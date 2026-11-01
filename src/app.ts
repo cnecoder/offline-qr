@@ -48,6 +48,8 @@ const history = createHistoryStore({ storage: localStorage })
 
 const items: ResultItem[] = []
 let uidCounter = 0
+// 识别结果纪元:清空时递增,在途识别结果据此作废(不再写入历史)
+let itemsEpoch = 0
 let toastTimer: number | undefined
 
 function refresh(): void {
@@ -103,6 +105,7 @@ function findItem(id: string): ResultItem | undefined {
 
 async function decodeItem(uid: string, file: File): Promise<void> {
   const t0 = performance.now()
+  const epoch = itemsEpoch
   try {
     const task = await ingest.fromBlob(file, file.name)
     const item = findItem(uid)
@@ -116,7 +119,8 @@ async function decodeItem(uid: string, file: File): Promise<void> {
       target.texts = texts
     }
     log('scan', `解码完成 ${Math.round(performance.now() - t0)}ms,结果 ${texts.length} 条`)
-    if (texts.length > 0) {
+    // 清空已发生时丢弃迟到的识别结果,不再写入历史
+    if (texts.length > 0 && epoch === itemsEpoch) {
       for (const text of texts) history.add(text)
       renderHistory()
     }
@@ -249,7 +253,11 @@ function renderHistory(): void {
     time.className = 'history-time'
     time.textContent = formatTime(entry.at)
     li.append(text, time)
-    li.addEventListener('click', () => recallEntry(entry.text))
+    li.addEventListener('click', () => {
+      recallEntry(entry.text)
+      historyOpen = false
+      renderHistory()
+    })
     historyList.append(li)
   }
 }
@@ -268,6 +276,14 @@ function recallEntry(text: string): void {
 
 historyToggle.addEventListener('click', () => {
   historyOpen = !historyOpen
+  renderHistory()
+})
+// 点击面板外部任意处自动收起历史面板
+document.addEventListener('pointerdown', event => {
+  if (!historyOpen) return
+  const node = event.target as Node
+  if (historyList.contains(node) || historyToggle.contains(node) || historyClear.contains(node)) return
+  historyOpen = false
   renderHistory()
 })
 // WebView2 默认禁用原生脚本对话框,window.confirm 恒返回 false(清空从未执行)——
@@ -290,8 +306,13 @@ historyClear.addEventListener('click', () => {
   }
   disarmHistoryClear()
   history.clear()
+  // 结果卡片区即"识别记录":与历史一并清空回到空态;在途识别结果作废
+  itemsEpoch++
+  items.length = 0
+  refresh()
+  refreshProgress()
   renderHistory()
-  flashToast('已清空识别历史')
+  flashToast('已清空识别记录与历史')
 })
 
 renderHistory()

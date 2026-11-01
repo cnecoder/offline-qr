@@ -44,20 +44,28 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/after-fail')
   })
 
-  test('识别历史:计数、展开、回显、清空', async ({ page }) => {
+  test('识别历史:计数、展开、外部收起、回显、清空记录与历史', async ({ page }) => {
     await pasteImage(page, qrPng(['https://example.com/history-1']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/history-1')
 
     await page.getByRole('button', { name: HISTORY_TOGGLE }).click()
     await expect(page.getByTestId('history-item')).toHaveCount(1)
 
+    // 点击面板外部自动收起
+    await page.getByTestId('dropzone').click()
+    await expect(page.getByTestId('history-list')).toBeHidden()
+
+    // 点击条目回显,面板自动收起
+    await page.getByRole('button', { name: HISTORY_TOGGLE }).click()
     await page.getByTestId('history-item').first().click()
     await expect(page.locator(RESULT_TEXT).first()).toHaveText('https://example.com/history-1')
+    await expect(page.getByTestId('history-list')).toBeHidden()
 
-    // WebView2 无原生 confirm:清空为二次点击确认
+    // WebView2 无原生 confirm:清空为二次点击确认;结果卡片与历史一并清空
     await page.getByTestId('history-clear').click()
     await page.getByTestId('history-clear').click()
     await expect(page.getByRole('button', { name: /最近识别\(0\)/ })).toBeVisible()
+    await expect(page.getByTestId('empty-hint')).toBeVisible()
   })
 
   test('文件选择对话框路径(多选)', async ({ page }) => {
