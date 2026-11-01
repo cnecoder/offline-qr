@@ -65,6 +65,7 @@
 | 21 | `feat: square thumb + source file path` | ① 缩略图拉伸对齐后保持正方形(aspect-ratio:1,宽度随高度);② 文件/拖动来源显示完整源文件路径:WebView2 不向网页暴露路径 → 桌面端文件选择改原生对话框(pick_image_files,tauri-plugin-dialog Rust 侧调用)、拖拽改原生拖放事件(onDragDropEvent,enter/leave 驱动高亮),新增 read_image_files 按路径读图;浏览器端保留 HTML5 流程(仅文件名);meta 行超长路径省略号 + title 悬停全文;scanner/history 恢复为生成历史共享模块 | ✔ 已完成(单测 + 23 E2E 全绿;桌面路径链路待 exe 人工复测) |
 | 22 | `refactor: latest highlight only + clear in toolbar` | ① "最新"徽标移除,仅保留卡片边缘强调色高亮;② 缩略图正方形修复:aspect-ratio 在 flex stretch 下对 img 不传递 → 改外层 div + JS 显式同步宽度=高度(渲染/展开/切 Tab 后触发);③ 清空按钮回归:工具条最右侧(与按钮簇隔离),二次确认,无记录隐藏 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
 | 23 | `refactor: standalone clear card` | 清空按钮改独立红色实心卡片:移出功能工具条,同行最右侧等高圆角矩形(danger #FF6B6B + 白字,不随主题),与左侧卡片隔离;二次确认交互不变 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
+| 24 | `feat: frameless rounded window` | 整窗圆角(Win10 无 DWM 圆角):无边框 + 透明窗,网页层画 10px 圆角/描边/阴影,四周 6px 透明边;自绘标题栏(data-tauri-drag-region 拖拽/双击最大化)+ 自绘最小化/最大化/关闭(关闭悬停危险色);构建标记经 build_info 命令移入自绘标题栏;最大化去圆角贴合屏幕;遮罩窗不受影响 | ✔ 已完成(单测 + 24 E2E 全绿;待 exe 人工复测) |
 
 每步完成后:勾选下方对应任务 + 更新本表状态 + commit。
 
@@ -170,3 +171,4 @@
 - 2026-11-01 缩略图方形 + 源文件路径(人工反馈):拉伸对齐后缩略图以 aspect-ratio:1 保持正方形;文件/拖动来源显示完整路径——WebView2 不向网页暴露路径,桌面端改原生通道(文件选择 = pick_image_files 原生对话框命令,拖拽 = onDragDropEvent 原生事件,新增 tauri-plugin-dialog 依赖与 read_image_files 读图命令),浏览器端保留 HTML5 流程;meta 行路径超长省略 + title 悬停全文。
 - 2026-11-01 卡片五轮微调(人工反馈):"最新"徽标移除仅留边缘高亮;缩略图正方形修复(aspect-ratio 对 flex stretch 的 img 不传递 → 外层 div + JS 同步宽度=高度,展开/切 Tab 后重同步);清空按钮回归至工具条最右侧(二次确认,与卡片历史共存)。
 - 2026-11-01 清空按钮独立卡片化(人工反馈):移出功能工具条,改为同行最右侧的独立红色实心圆角卡片(danger #FF6B6B + 白字),与左侧功能卡片等高隔离;二次确认交互不变。用户回到本机,后续以 exe 实测为准,不再走浏览器预览截图。
+- 2026-11-01 整窗圆角(人工反馈):Win10 无 DWM 圆角,采用无边框 + 透明窗 + 网页层圆角方案(decorations:false / transparent:true);自绘标题栏(拖拽、双击最大化)与最小化/最大化/关闭按钮,构建标记经新增 build_info 命令移入自绘标题栏,任务栏标题保留;最大化时去圆角;遮罩选区窗不受影响。

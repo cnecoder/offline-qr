@@ -29,11 +29,17 @@
   </head>
   <body>
     <div class="app" id="app">
-      <header class="header">
-        <h1>二维码识别</h1>
+      <header class="header" data-tauri-drag-region>
+        <h1 data-tauri-drag-region>二维码识别</h1>
+        <span id="build-marker" class="build-marker" hidden data-tauri-drag-region></span>
         <div class="header-right">
           <button id="theme-toggle" class="theme-toggle" type="button" title="切换配色(黑绿 / 黑黄)">配色 绿</button>
-          <span class="subtitle">离线 · 本地运行</span>
+          <span class="subtitle" data-tauri-drag-region>离线 · 本地运行</span>
+          <div class="win-controls" id="win-controls" hidden>
+            <button class="win-btn" id="win-min" type="button" aria-label="最小化">─</button>
+            <button class="win-btn" id="win-max" type="button" aria-label="最大化">□</button>
+            <button class="win-btn win-close" id="win-close" type="button" aria-label="关闭">✕</button>
+          </div>
         </div>
       </header>
 

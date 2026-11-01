@@ -324,6 +324,37 @@ async fn dump_failed_region(app: AppHandle, png_base64: String) -> Result<String
     Ok(path.display().to_string())
 }
 
+/// 构建标记文本(任务栏标题与自绘标题栏共用)
+fn build_marker_text() -> String {
+    let build_ts: u64 = option_env!("BUILD_UNIX").and_then(|s| s.parse().ok()).unwrap_or(0);
+    let build_label = if build_ts > 0 {
+        use chrono::TimeZone as _;
+        chrono::Local
+            .timestamp_opt(build_ts as i64, 0)
+            .earliest()
+            .map(|dt| dt.format("%m%d %H:%M:%S").to_string())
+            .unwrap_or_else(|| format!("unix:{build_ts}"))
+    } else {
+        "未知".into()
+    };
+    let exe_meta = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.metadata().ok())
+        .and_then(|m| m.modified().ok())
+        .map(|t| {
+            let dt: chrono::DateTime<LocalTime> = t.into();
+            dt.format("%H:%M:%S").to_string()
+        })
+        .unwrap_or_else(|| "?".into());
+    format!("构建 {build_label} · exe {exe_meta}")
+}
+
+/// 自绘标题栏的构建标记(无边框窗口原生标题不再可见)
+#[tauri::command]
+fn build_info() -> String {
+    build_marker_text()
+}
+
 /// 前端日志批量落盘(FR-10)
 #[tauri::command]
 async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
@@ -418,29 +449,9 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // 构建标记:标题栏显示构建时间,日志记录 exe 自身文件时间——用于确认运行的构建版本
-            let build_ts: u64 = option_env!("BUILD_UNIX").and_then(|s| s.parse().ok()).unwrap_or(0);
-            let build_label = if build_ts > 0 {
-                use chrono::TimeZone as _;
-                chrono::Local
-                    .timestamp_opt(build_ts as i64, 0)
-                    .earliest()
-                    .map(|dt| dt.format("%m%d %H:%M:%S").to_string())
-                    .unwrap_or_else(|| format!("unix:{build_ts}"))
-            } else {
-                "未知".into()
-            };
-            let exe_meta = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.metadata().ok())
-                .and_then(|m| m.modified().ok())
-                .map(|t| {
-                    let dt: chrono::DateTime<LocalTime> = t.into();
-                    dt.format("%H:%M:%S").to_string()
-                })
-                .unwrap_or_else(|| "?".into());
+            // 构建标记:任务栏标题保留,自绘标题栏由前端经 build_info 获取
             if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_title(&format!("二维码识别 [构建 {build_label} · exe {exe_meta}]"));
+                let _ = window.set_title(&format!("二维码识别 [{}]", build_marker_text()));
             }
             log_event(
                 &handle,
@@ -470,7 +481,8 @@ pub fn run() {
             append_log,
             dump_failed_region,
             pick_image_files,
-            read_image_files
+            read_image_files,
+            build_info
         ])
         .run(tauri::generate_context!())
         .expect("QrTool 运行失败");
