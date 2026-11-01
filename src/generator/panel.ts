@@ -180,6 +180,8 @@ export function initGeneratePanel(): void {
         applyContent(entry.content)
         render()
         showStatus('已恢复该次生成内容')
+        historyOpen = false
+        renderGenHistory()
       })
       historyList.append(li)
     }
@@ -195,11 +197,34 @@ export function initGeneratePanel(): void {
     historyOpen = !historyOpen
     renderGenHistory()
   })
+  // WebView2 禁用原生脚本对话框(confirm 恒 false),改用应用内二次点击确认
+  let genClearArmed = false
+  let genClearArmTimer: number | undefined
+  function disarmGenClear(): void {
+    genClearArmed = false
+    window.clearTimeout(genClearArmTimer)
+    historyClear.textContent = '清空'
+    historyClear.classList.remove('danger')
+  }
   historyClear.addEventListener('click', () => {
-    if (window.confirm('确定清空全部生成历史?')) {
-      genHistory.clear()
-      renderGenHistory()
+    if (!genClearArmed) {
+      genClearArmed = true
+      historyClear.textContent = '再点一次确认清空'
+      historyClear.classList.add('danger')
+      genClearArmTimer = window.setTimeout(disarmGenClear, 3000)
+      return
     }
+    disarmGenClear()
+    genHistory.clear()
+    renderGenHistory()
+  })
+  // 点击面板外部任意处自动收起生成历史面板
+  document.addEventListener('pointerdown', event => {
+    if (!historyOpen) return
+    const node = event.target as Node
+    if (historyList.contains(node) || historyToggle.contains(node) || historyClear.contains(node)) return
+    historyOpen = false
+    renderGenHistory()
   })
 
   // ---- 样式状态 ----

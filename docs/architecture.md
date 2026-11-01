@@ -89,19 +89,57 @@ File / Blob
 ```
 主窗 [屏幕选区] 按钮(仅 __TAURI_INTERNALS__ 存在时显示)
   → invoke start_capture
-      Rust: screenshots 截取主显示器 → PNG → base64 存入 Mutex<State>
-      Rust: 创建全屏无边框置顶遮罩窗口 region-overlay(加载同一前端)
-遮罩窗(main.ts 按窗口 label 进入 overlay 模式)
-  → invoke get_capture → 全屏显示截图 + 十字光标 + 暗化
+      Rust: 隐藏主窗(主线程同步)+ 等待 DWM 重新合成(150ms,防残影)→ 逐屏并行截屏(screenshots crate)
+            → 每屏 PNG/base64 存入 Mutex<Vec<ScreenCapture>>(含该屏逻辑坐标 = 物理 / scale_factor)
+      Rust: 每个显示器创建一个遮罩窗口 region-overlay-<i>(无边框置顶,按逻辑坐标定位,
+            以 visible=false 隐藏创建——规避 Windows 开窗展开动画)
+遮罩窗(main.ts 按窗口 label 序号进入 overlay 模式)
+  → invoke get_capture(index) → 全屏显示该屏截图 + 十字光标 + 暗化
   → 拖拽出矩形(选区状态机,纯函数)
   → 松手:canvas 按图像像素裁剪 → toDataURL → invoke finish_capture(pngBase64)
   → Esc:invoke cancel_capture
-Rust(finish/cancel):关闭遮罩窗;finish 额外 emit "region-captured"(pngBase64)
+  → 位图就绪:invoke show_overlay(index) → 窗口显示 + 180ms 淡入
+Rust(finish/cancel):关闭全部遮罩;finish 额外 emit "region-captured"(pngBase64)
 主窗 listen("region-captured") → base64 → File → 复用 enqueueFiles 识别管线
 ```
 
 - 选区坐标换算(CSS px → 图像 px,含 DPI 缩放)与选区状态机均为纯函数,独立单测。
 - 浏览器形态无 Tauri IPC:按钮隐藏;直接打开遮罩 URL 时降级为提示文案。
+- 引擎侧兜底:单张解码超时(8s)或 Worker 异常终止时自动重建 Worker 并按失败落定,
+  "识别中"状态必然终结(见 §5 engine 与 §9 风险表)。
+- 交互:遮罩以 180ms 淡入呈现(截图位图就绪后触发),消除触发时的白闪。
+- 裁剪源使用 `createImageBitmap(image)` 位图(而非 `<img>` 元素直接 drawImage),
+  规避 WebView2 下元素位图的不确定性;仅接受 dataURL 源,无画布污染风险。
+- 文件拖拽/选择双通道:浏览器走标准 HTML5 拖放与 input(拿不到文件路径,meta 只显示文件名);
+  桌面端 Tauri 原生拖放会吞掉 HTML5 drop 事件,故改用 `getCurrentWebview().onDragDropEvent`
+  (事件携带文件完整路径,高亮由 enter/leave 驱动),文件选择用原生对话框命令
+  `pick_image_files`(tauri-plugin-dialog,Rust 侧调用,无能力项),路径经
+  `read_image_files` 命令读回字节——WebView2 不向网页暴露文件路径,桌面端只能走原生通道。
+- WebView2 默认禁用原生脚本对话框,`window.confirm/alert` 恒返回 false:
+  破坏性操作(清空历史等)一律用应用内二次点击确认,不依赖原生对话框。
+- 全局快捷键(`tauri-plugin-global-shortcut`,Rust 侧注册不占前端能力):
+  `Alt+Q` 直接调用 start_capture 发起屏幕选区,`Alt+W` 主线程切换主窗显隐;
+  注册失败(组合键被占用)仅记日志降级,不影响应用内按钮路径。
+
+### 参考方案(开源截图/扫码工具调研,2026-11-01)
+
+| 工具 | 多屏方案 | 借鉴点 |
+|---|---|---|
+| Flameshot | 每屏一个全屏遮罩窗,跨屏协调选择 | 与本项目方案一致;其历史痛点集中在混合 DPI 坐标映射(#4894/#4385) |
+| ShareX | 冻结的整虚拟桌面合成位图 + 单一选区 UI | "冻结屏幕"防闪烁(本项目用静态截图垫底,等效) |
+| ksnip | 全组合 + 逐屏两种捕获模式 | 混合分辨率下表现较好,可作为后期"整桌ation单选区"模式的参考 |
+
+结论:逐屏遮罩是主流做法;三者的共同翻车点是混合 DPI 多屏——本项目已在遮罩定位与
+裁剪换算处统一走"物理 px ↔ 逻辑 px(÷scale_factor)"换算,并写入日志便于定位。
+
+### 诊断日志(2026-11-01)
+
+- Rust:日志写入 `%LOCALAPPDATA%/…/app_local_data/logs/offlineqr-YYYYMMDD.log`,
+  行格式 `[YYYY-MM-DD HH:MM:SS.mmm][rust] 消息`;截屏命令全链路埋点
+  (显示器枚举、每屏截屏耗时与尺寸、遮罩窗创建、finish/cancel)。
+- 前端:`shared/log.ts` 提供同格式日志(时间戳精确到毫秒),console 输出 + 缓冲批量
+  经 `append_log` 命令写入同一文件(桌面形态;浏览器形态仅 console)。
+- 用途:用户报告问题时提供日志文件,替代猜测式排查。
 
 ## 4b. 生成管线(recognition-generation 分支)
 
@@ -204,6 +242,21 @@ GenContent(text | wifi | vcard,表单状态)
 
 覆盖率门禁:`vitest --coverage`,src 全局阈值 ≥ 80%(装配层 main.ts 与 worker.ts 除外)。
 
+### 测试盲区与问题复盘(2026-11-01)
+
+| 已发生问题 | 为什么测试没拦住 | 已补措施 |
+|---|---|---|
+| Windows 同步命令建窗死锁(v1.1.0) | Vitest/E2E 均运行在浏览器环境,Rust 事件循环不在覆盖范围 | 涉窗命令 async 规则入文档与风险表;诊断日志兜底定位 |
+| 无码图"识别中"永挂(v1.2.0) | 假 Worker 未建模"Worker 静默死亡"场景 | 引擎超时/onerror 重建单测(engine.test.ts ×2) |
+| 屏幕选区仅主屏(v1.2.0) | 多屏几何属 OS 层,单测不可达 | label 解析纯函数单测;逐屏几何写入日志;人工 smoke 清单 |
+| 选区含码却报未识别(v1.2.0) | 区域截图裁剪链路无诊断,WebView2 行为差异不可预知 | 全链路日志(视口/DPR/尺寸/裁剪/回传);裁剪改 ImageBitmap;失败样张落盘 |
+| 主窗"幽灵副本"进入截图(v1.2.1-dev) | 主窗 hide 为异步派发,截屏线程先行,像素取证证实幽灵为 35% 暗化副本 | 显隐改为主线程同步执行(run_on_main_thread + 标志位确认);遮罩黑色底全程不透明,仅淡入截图内容 |
+| 主窗 hide 后截屏仍带"半透明残影"(v1.2.1-dev 复测) | hide 仅改窗口标志,DWM 下一合成帧才把窗口移出桌面画面,GDI BitBlt 取已合成帧;窗口标志/is_visible 无法感知合成时机,浏览器内自动化测试完全不可达 | hide 确认后固定等待 150ms(约 9 合成帧)再截屏;日志记录隐藏→截屏间隔,人工 smoke 验证 |
+| 选区识别在内嵌资源构建全挂、dev 全绿(v1.2.1-dev) | CSP 仅生产(custom-protocol)构建注入,vitest/E2E 从不经过 CSP;CSP 缺 worker-src 时 Blob 内联 Worker 被拦,Worker 立即死亡 | CSP 约束固化为守卫单测(src/tauri-csp.test.ts:blob worker / wasm-unsafe-eval / img data:);发布前人工 smoke 必含"选区识别 + 粘贴识别";失败卡显示真实引擎错误 |
+| 桌面端文件拖拽失效 / 清空历史无效(v1.2.1-dev) | WebView2 壳层行为(Tauri 原生拖放接管吞掉 HTML5 drop;原生脚本对话框禁用致 confirm 恒 false)在浏览器 E2E 中完全不可见 | 主窗 `dragDropEnabled: false` 走标准 HTML5 拖放;确认交互一律应用内二次点击,禁用 window.confirm;桌面 smoke 清单必含"拖拽图片 + 清空历史" |
+
+结论:OS/窗口层以"结构化日志 + 人工 smoke 清单"兜底;纯逻辑一律补单测。
+
 ## 9. 风险与对策
 
 | 风险 | 对策 |
@@ -211,6 +264,8 @@ GenContent(text | wifi | vcard,表单状态)
 | file:// 下 WASM 实例化受限 | 非 streaming 实例化;仍不行则单文件版注明 localhost 使用(Worker 内联风险已由 `?worker&inline` 从设计上规避) |
 | @zxing/zxing-wasm API 与本文档有出入 | 以官方 README 为准,差异收敛在 engine.ts 一处适配 |
 | 批量大图内存占用 | 队列串行 + ImageBitmap 即用即 close |
-| 屏幕选区多显示器/高分屏 DPI 差异 | v1 仅主显示器(原点屏),缩放按图像/视口比例换算;真机体验列入人工验证 |
+| 屏幕选区多显示器/高分屏 DPI 差异 | 逐屏遮罩 + 逻辑坐标定位(物理/缩放);混合缩放倍率场景需真机回归 |
+| Tauri Windows 同步命令内创建窗口死锁 | 涉窗口操作命令一律 `async fn`(v1.1.1 修复:同步命令阻塞主线程事件循环会整窗无响应) |
+| 解码后台静默挂起(Worker 异常等) | 引擎三重兜底:8s 超时终止重建 / Worker onerror 重建 / maxNumberOfSymbols 有界——"识别中"必然终结(v1.2.0) |
 | 美化样式破坏可扫性 | 渲染器规则强制(实心眼环/挖孔/留白)+ 内置引擎实时试扫徽章 + E2E 闭环断言 |
 | SVG 栅格化画布污染 | Logo 仅接受 dataURL;全资源本地内联 |

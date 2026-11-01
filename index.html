@@ -4,13 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%234f46e5'/><rect x='18' y='18' width='26' height='26' rx='4' fill='white'/><rect x='56' y='18' width='26' height='26' rx='4' fill='white'/><rect x='18' y='56' width='26' height='26' rx='4' fill='white'/><rect x='58' y='58' width='10' height='10' fill='white'/><rect x='72' y='72' width='10' height='10' fill='white'/></svg>" />
-    <title>二维码识别</title>
+    <title>极简二维码</title>
+    <style>
+      /* 遮罩窗口关键样式内联:在任何 JS/CSS 加载前生效,杜绝无样式闪烁 */
+      html.overlay-mode { background: #000; }
+      html.overlay-mode .app { display: none; }
+    </style>
+    <script>
+      // 遮罩窗口(region-overlay-*):首帧前隐藏应用 UI,遮罩窗内只应存在选区层
+      (function () {
+        try {
+          var label = window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.metadata && window.__TAURI_INTERNALS__.metadata.currentWindow ? window.__TAURI_INTERNALS__.metadata.currentWindow.label : ''
+          if (/^region-overlay-\d+$/.test(label) || new URLSearchParams(window.location.search).has('overlay')) {
+            document.documentElement.classList.add('overlay-mode')
+          }
+        } catch (e) { /* 非桌面环境忽略 */ }
+        // 配色主题:首帧前应用持久化主题,避免闪换
+        try {
+          var t = localStorage.getItem('qr.theme.v1')
+          document.documentElement.dataset.theme = t === 'black-yellow' ? 'black-yellow' : 'black-green'
+        } catch (e2) { /* 存储不可用则走 CSS 默认 */ }
+      })()
+    </script>
   </head>
   <body>
     <div class="app" id="app">
       <header class="header">
-        <h1>二维码识别</h1>
-        <span class="subtitle">离线 · 本地运行</span>
+        <h1>极简二维码</h1>
+        <div class="header-right">
+          <button id="theme-toggle" class="theme-toggle" type="button" title="切换配色(黑绿 / 黑黄)">配色 绿</button>
+          <span class="subtitle">离线 · 本地运行</span>
+        </div>
       </header>
 
       <nav class="tabs" id="tabs">
@@ -20,12 +44,15 @@
 
       <!-- 识别面板 -->
       <div id="panel-scan" class="panel" data-testid="panel-scan">
-        <section id="dropzone" class="toolbar" data-testid="dropzone">
-          <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
-          <button id="region-button" data-testid="region-button" hidden>屏幕选区</button>
-          <span class="toolbar-hint">拖拽图片到窗口,或 Ctrl+V 粘贴截图</span>
-          <input id="file-input" type="file" accept="image/*" multiple hidden />
-        </section>
+        <div class="toolbar-row">
+          <section id="dropzone" class="toolbar" data-testid="dropzone">
+            <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
+            <button id="region-button" class="primary" data-testid="region-button" hidden>屏幕选区</button>
+            <span class="toolbar-hint">拖拽 / Ctrl+V 粘贴 / 全局 Alt+Q 屏幕选区</span>
+            <input id="file-input" type="file" accept="image/*" multiple hidden />
+          </section>
+          <button id="clear-button" class="clear-button" data-testid="clear-button" hidden>清空</button>
+        </div>
 
         <p id="progress" class="progress" data-testid="progress" hidden></p>
 
@@ -43,14 +70,6 @@
             <p class="empty-sub">粘贴、拖拽或选择含二维码的图片</p>
           </div>
         </main>
-
-        <section class="history">
-          <div class="history-bar">
-            <button id="history-toggle" class="history-toggle" data-testid="history-toggle" aria-expanded="false">最近识别(0)</button>
-            <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
-          </div>
-          <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
-        </section>
       </div>
 
       <!-- 生成面板 -->

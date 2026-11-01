@@ -1,7 +1,7 @@
 {
-  "name": "qr-tool",
+  "name": "offlineqr",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "fixtures": "node scripts/gen-test-fixtures.mjs",
     "verify:fixtures": "node scripts/verify-fixtures.mjs",
     "coverage": "vitest run --coverage",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "portable": "node scripts/make-portable.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

@@ -70,8 +70,37 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'QrTool ${{ github.ref_name }}'
+          releaseName: 'OfflineQR ${{ github.ref_name }}'
           releaseBody: '离线二维码识别与生成工具。见 Assets 下载对应平台安装包。'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Build portable zip (Windows 免安装版)
+        if: matrix.platform == 'windows-latest'
+        run: node scripts/make-portable.mjs
+
+      - name: Upload portable zip to release
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/OfflineQR_${VERSION}_portable_x64.zip" --clobber
+
+      - name: Collect failed-step logs
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh run view "${{ github.run_id }}" --log-failed > failed-steps.log 2>&1 || true
+
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs-${{ matrix.platform }}
+          path: failed-steps.log
+          retention-days: 14
+          if-no-files-found: ignore

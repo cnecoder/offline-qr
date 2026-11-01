@@ -1,3 +1,9 @@
+/** 从遮罩窗口 label 解析屏幕序号(region-overlay-2 → 2);非遮罩 label 返回 null */
+export function overlayIndexFromLabel(label: string): number | null {
+  const match = /^region-overlay-(\d+)$/.exec(label)
+  return match ? Number(match[1]) : null
+}
+
 export interface Point {
   x: number
   y: number
