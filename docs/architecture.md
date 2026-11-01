@@ -114,6 +114,9 @@ Rust(finish/cancel):关闭全部遮罩;finish 额外 emit "region-captured"(pngB
   (浏览器正常、exe 失效的根因);主窗走标准 HTML5 拖放(window 级 dragover/drop)。
 - WebView2 默认禁用原生脚本对话框,`window.confirm/alert` 恒返回 false:
   破坏性操作(清空历史等)一律用应用内二次点击确认,不依赖原生对话框。
+- 全局快捷键(`tauri-plugin-global-shortcut`,Rust 侧注册不占前端能力):
+  `Alt+Q` 直接调用 start_capture 发起屏幕选区,`Alt+W` 主线程切换主窗显隐;
+  注册失败(组合键被占用)仅记日志降级,不影响应用内按钮路径。
 
 ### 参考方案(开源截图/扫码工具调研,2026-11-01)
 
