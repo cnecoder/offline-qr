@@ -8,6 +8,7 @@ import { createSerialQueue } from './scanner/queue'
 import { renderResults, type ResultItem } from './scanner/results'
 import { log } from './shared/log'
 import { createProgress, hideToast, showToast } from './shared/status'
+import { getTheme, setTheme } from './shared/theme'
 
 log('app', `主窗启动(桌面:${'__TAURI_INTERNALS__' in window ? '是' : '否'})`)
 
@@ -46,14 +47,27 @@ const queue = createSerialQueue()
 const progress = createProgress(progressEl)
 const history = createHistoryStore({ storage: localStorage })
 
+// 配色主题:黑绿/黑黄切换,持久化到 localStorage(首帧前由 index.html 内联脚本应用)
+const themeToggle = document.getElementById('theme-toggle') as HTMLButtonElement
+function syncThemeButton(): void {
+  themeToggle.textContent = getTheme() === 'black-yellow' ? '配色 黄' : '配色 绿'
+}
+themeToggle.addEventListener('click', () => {
+  setTheme(getTheme() === 'black-yellow' ? 'black-green' : 'black-yellow')
+  syncThemeButton()
+})
+syncThemeButton()
+
 const items: ResultItem[] = []
 let uidCounter = 0
 // 识别结果纪元:清空时递增,在途识别结果据此作废(不再写入历史)
 let itemsEpoch = 0
+// 最新完成识别的条目:结果卡片着重显示
+let latestDoneId = ''
 let toastTimer: number | undefined
 
 function refresh(): void {
-  renderResults(resultsEl, items, { onCopy: handleCopy })
+  renderResults(resultsEl, items, { onCopy: handleCopy, latestId: latestDoneId })
   emptyHint.hidden = items.length > 0
 }
 
@@ -118,6 +132,7 @@ async function decodeItem(uid: string, file: File): Promise<void> {
       target.state = texts.length > 0 ? 'done' : 'failed'
       target.texts = texts
     }
+    latestDoneId = uid
     log('scan', `解码完成 ${Math.round(performance.now() - t0)}ms,结果 ${texts.length} 条`)
     // 清空已发生时丢弃迟到的识别结果,不再写入历史
     if (texts.length > 0 && epoch === itemsEpoch) {
@@ -130,6 +145,7 @@ async function decodeItem(uid: string, file: File): Promise<void> {
       target.state = 'failed'
       target.error = err instanceof Error ? err.message : String(err)
     }
+    latestDoneId = uid
     log('scan', `识别失败:${err instanceof Error ? err.message : String(err)}`)
   }
   // 屏幕选区识别失败(异常或 0 结果):把裁剪样张落盘,便于核对引擎实际看到的内容
@@ -263,8 +279,10 @@ function renderHistory(): void {
 }
 
 function recallEntry(text: string): void {
+  const rid = `recall-${++recallCounter}`
+  latestDoneId = rid
   items.unshift({
-    id: `recall-${++recallCounter}`,
+    id: rid,
     name: '历史记录',
     thumb: '',
     state: 'done',
@@ -308,6 +326,7 @@ historyClear.addEventListener('click', () => {
   history.clear()
   // 结果卡片区即"识别记录":与历史一并清空回到空态;在途识别结果作废
   itemsEpoch++
+  latestDoneId = ''
   items.length = 0
   refresh()
   refreshProgress()

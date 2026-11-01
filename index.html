@@ -19,6 +19,11 @@
             document.documentElement.classList.add('overlay-mode')
           }
         } catch (e) { /* 非桌面环境忽略 */ }
+        // 配色主题:首帧前应用持久化主题,避免闪换
+        try {
+          var t = localStorage.getItem('qr.theme.v1')
+          document.documentElement.dataset.theme = t === 'black-yellow' ? 'black-yellow' : 'black-green'
+        } catch (e2) { /* 存储不可用则走 CSS 默认 */ }
       })()
     </script>
   </head>
@@ -26,7 +31,10 @@
     <div class="app" id="app">
       <header class="header">
         <h1>二维码识别</h1>
-        <span class="subtitle">离线 · 本地运行</span>
+        <div class="header-right">
+          <button id="theme-toggle" class="theme-toggle" type="button" title="切换配色(黑绿 / 黑黄)">配色 绿</button>
+          <span class="subtitle">离线 · 本地运行</span>
+        </div>
       </header>
 
       <nav class="tabs" id="tabs">
@@ -39,7 +47,7 @@
         <section id="dropzone" class="toolbar" data-testid="dropzone">
           <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
           <button id="region-button" data-testid="region-button" hidden>屏幕选区</button>
-          <span class="toolbar-hint">拖拽图片到窗口,或 Ctrl+V 粘贴截图</span>
+          <span class="toolbar-hint">拖拽 / Ctrl+V 粘贴 / 全局 Alt+Q 屏幕选区</span>
           <input id="file-input" type="file" accept="image/*" multiple hidden />
         </section>
 

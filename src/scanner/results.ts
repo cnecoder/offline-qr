@@ -11,24 +11,28 @@ export interface ResultItem {
   error?: string
 }
 
-export interface ResultHandlers {
-  /** 点击"复制"时触发(剪贴板写入与提示由装配层处理) */
+export interface ResultRenderOptions {
+  /** 复制文本时触发(剪贴板写入与提示由装配层处理) */
   onCopy?: (text: string) => void
+  /** 最新完成识别的条目 id:对应卡片以强调色描边并带"最新"徽标 */
+  latestId?: string
 }
 
 /** 全量重绘结果列表(列表规模小,无需增量更新) */
 export function renderResults(
   container: HTMLElement,
   items: ResultItem[],
-  handlers: ResultHandlers = {},
+  options: ResultRenderOptions = {},
 ): void {
   container.replaceChildren()
-  for (const item of items) container.append(renderCard(item, handlers))
+  for (const item of items) container.append(renderCard(item, options))
 }
 
-export function renderCard(item: ResultItem, handlers: ResultHandlers = {}): HTMLElement {
+export function renderCard(item: ResultItem, options: ResultRenderOptions = {}): HTMLElement {
   const card = document.createElement('article')
   card.className = item.state === 'failed' ? 'result-card fail' : 'result-card'
+  const isLatest = item.state !== 'pending' && item.id === options.latestId
+  if (isLatest) card.classList.add('latest')
   card.dataset.testid = `result-card-${item.id}`
 
   if (item.thumb) {
@@ -43,20 +47,71 @@ export function renderCard(item: ResultItem, handlers: ResultHandlers = {}): HTM
   body.className = 'card-body'
   if (item.state === 'pending') {
     body.append(message('识别中…'))
-  } else if (item.state === 'failed') {
-    // 引擎异常时直接给出真实原因,避免误导用户去检查选区完整性
-    body.append(
-      message(
-        item.error
-          ? `识别异常:${item.error}`
-          : '未识别到二维码(请确认选区完整包含二维码及其四周留白)',
-      ),
-    )
   } else {
-    for (const text of item.texts) body.append(textBlock(text, handlers))
+    if (isLatest) body.append(latestChip())
+    if (item.state === 'failed') {
+      // 引擎异常时直接给出真实原因,避免误导用户去检查选区完整性
+      body.append(
+        message(
+          item.error
+            ? `识别异常:${item.error}`
+            : '未识别到二维码(请确认选区完整包含二维码及其四周留白)',
+        ),
+      )
+    } else {
+      for (const text of item.texts) body.append(textRow(text, options))
+    }
   }
   card.append(body)
   return card
+}
+
+/** 点击"全选":选中文本块全部内容,可直接 Ctrl+C */
+function selectContents(el: HTMLElement): void {
+  const range = document.createRange()
+  range.selectNodeContents(el)
+  const selection = window.getSelection()
+  if (!selection) return
+  selection.removeAllRanges()
+  selection.addRange(range)
+}
+
+/** 单条文本行:文本块(独立底色,明确区分)+ 右侧 全选/复制 按钮列 */
+function textRow(text: string, options: ResultRenderOptions): HTMLElement {
+  const row = document.createElement('div')
+  row.className = 'result-row'
+
+  const pre = document.createElement('p')
+  pre.className = 'result-text'
+  pre.dataset.testid = 'result-text'
+  pre.textContent = text
+  if (text.length > COLLAPSE_LENGTH || text.includes('\n')) {
+    pre.classList.add('collapsed')
+    pre.addEventListener('click', () => pre.classList.toggle('collapsed'))
+  }
+  row.append(pre)
+
+  const actions = document.createElement('div')
+  actions.className = 'row-actions'
+  const selectAll = document.createElement('button')
+  selectAll.textContent = '全选'
+  selectAll.dataset.testid = 'select-button'
+  selectAll.addEventListener('click', () => selectContents(pre))
+  const copy = document.createElement('button')
+  copy.textContent = '复制'
+  copy.className = 'copy-button'
+  copy.dataset.testid = 'copy-button'
+  copy.addEventListener('click', () => options.onCopy?.(text))
+  actions.append(selectAll, copy)
+  row.append(actions)
+  return row
+}
+
+function latestChip(): HTMLElement {
+  const chip = document.createElement('span')
+  chip.className = 'latest-chip'
+  chip.textContent = '最新'
+  return chip
 }
 
 function message(text: string): HTMLElement {
@@ -68,29 +123,3 @@ function message(text: string): HTMLElement {
 
 /** 超过该长度或含换行的文本默认折叠,点击展开 */
 const COLLAPSE_LENGTH = 80
-
-function textBlock(text: string, handlers: ResultHandlers): HTMLElement {
-  const wrap = document.createElement('div')
-
-  const pre = document.createElement('p')
-  pre.className = 'result-text'
-  pre.dataset.testid = 'result-text'
-  pre.textContent = text
-  if (text.length > COLLAPSE_LENGTH || text.includes('\n')) {
-    pre.classList.add('collapsed')
-    pre.addEventListener('click', () => pre.classList.toggle('collapsed'))
-  }
-  wrap.append(pre)
-
-  const actions = document.createElement('div')
-  actions.className = 'card-actions'
-
-  const copy = document.createElement('button')
-  copy.textContent = '复制'
-  copy.dataset.testid = 'copy-button'
-  copy.addEventListener('click', () => handlers.onCopy?.(text))
-  actions.append(copy)
-
-  wrap.append(actions)
-  return wrap
-}

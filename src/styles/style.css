@@ -27,14 +27,26 @@
   --danger: #ff6b6b;
   --danger-weak: rgba(255, 107, 107, 0.12);
 
-  /* 强调色:黑绿 */
+  /* 强调色走主题块(见下),基底与主题无关 */
+
+  --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+
+/* ===== 主题:只换 accent(WinTab 双主题:黑绿默认 + 黑黄) ===== */
+:root,
+[data-theme="black-green"] {
   --accent: #35d07a;
   --accent-strong: #48e08c;
   --accent-rgb: 53, 208, 122;
   --on-accent: #04240f;
   --accent-weak: rgba(53, 208, 122, 0.12);
-
-  --shadow-panel: 0 6px 24px rgba(0, 0, 0, 0.45);
+}
+[data-theme="black-yellow"] {
+  --accent: #fbbf24;
+  --accent-strong: #fcd34d;
+  --accent-rgb: 251, 191, 36;
+  --on-accent: #241a02;
+  --accent-weak: rgba(251, 191, 36, 0.12);
 }
 
 * { box-sizing: border-box; }
@@ -77,6 +89,13 @@ body {
   border-bottom: 1px solid var(--border);
 }
 .header h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.theme-toggle {
+  padding: 2px 10px;
+  font-size: 11.5px;
+  border-radius: 999px;
+  color: var(--muted);
+}
 .subtitle { color: var(--off); font-size: 12px; }
 
 /* 输入条 */
@@ -183,6 +202,22 @@ button.primary:hover {
   border-radius: var(--r-panel);
 }
 .result-card.fail { opacity: 0.7; }
+/* 最新完成的识别:accent 描边着重,配合"最新"徽标 */
+.result-card.latest {
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.25);
+}
+.latest-chip {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 16px;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--accent-weak);
+  margin-bottom: 4px;
+}
 .thumb {
   width: 44px;
   height: 44px;
@@ -192,12 +227,26 @@ button.primary:hover {
   flex-shrink: 0;
 }
 .card-body { flex: 1; min-width: 0; }
+/* 单条文本行:独立底色的文本块 + 右侧 全选/复制 按钮列 */
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.result-row + .result-row { margin-top: 6px; }
 .result-text {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-family: var(--font-mono);
   font-size: 13px;
   word-break: break-all;
   white-space: pre-wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-control);
+  padding: 6px 8px;
+  user-select: text;
 }
 .result-text.collapsed {
   display: -webkit-box;
@@ -206,8 +255,28 @@ button.primary:hover {
   overflow: hidden;
   cursor: pointer;
 }
-.card-actions { display: flex; gap: 6px; margin-top: 6px; }
-.card-actions button { padding: 3px 10px; font-size: 12px; border-radius: var(--r-control); }
+.row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.row-actions button {
+  padding: 1px 10px;
+  font-size: 11.5px;
+  border-radius: var(--r-control);
+}
+.row-actions .copy-button {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.row-actions .copy-button:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: var(--on-accent);
+}
 .card-msg { margin: 0; color: var(--muted); font-size: 13px; }
 
 /* 历史:底部状态条 + 上浮面板 */

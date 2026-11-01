@@ -97,6 +97,27 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     const external = requests.filter(url => !url.startsWith('http://localhost:4173'))
     expect(external).toEqual([])
   })
+
+  test('配色主题:点击切换 黑绿 ↔ 黑黄 并持久化', async ({ page }) => {
+    const html = page.locator('html')
+    await expect(html).toHaveAttribute('data-theme', 'black-green')
+    await page.getByRole('button', { name: /配色/ }).click()
+    await expect(html).toHaveAttribute('data-theme', 'black-yellow')
+    await page.reload()
+    await expect(html).toHaveAttribute('data-theme', 'black-yellow')
+    await page.getByRole('button', { name: /配色/ }).click()
+    await expect(html).toHaveAttribute('data-theme', 'black-green')
+  })
+
+  test('结果卡片:全选按钮选中文本,复制按钮右置', async ({ page }) => {
+    await pasteImage(page, qrPng(['https://example.com/select-all']))
+    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/select-all')
+    await page.getByTestId('select-button').click()
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
+    expect(selected).toBe('https://example.com/select-all')
+    await expect(page.getByTestId('copy-button')).toBeVisible()
+    await expect(page.locator('.result-card.latest')).toHaveCount(1)
+  })
 })
 
 test.describe('二维码识别 · E2E(file:// 直开单文件产物)', () => {
