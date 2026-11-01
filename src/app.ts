@@ -125,6 +125,16 @@ async function decodeItem(uid: string, file: File): Promise<void> {
     if (target) target.state = 'failed'
     log('scan', `识别失败:${err instanceof Error ? err.message : String(err)}`)
   }
+  // 屏幕选区识别失败(异常或 0 结果):把裁剪样张落盘,便于核对引擎实际看到的内容
+  const target = findItem(uid)
+  if (target && target.state === 'failed' && file.name === '屏幕选区.png' && lastRegionPngBase64) {
+    try {
+      const path = await invoke<string>('dump_failed_region', { pngBase64: lastRegionPngBase64 })
+      log('scan', `失败选区样张已保存:${path}`)
+    } catch (err) {
+      log('scan', `样张落盘失败:${String(err)}`)
+    }
+  }
   refresh()
   refreshProgress()
 }
@@ -188,6 +198,7 @@ document.addEventListener('paste', (event: ClipboardEvent) => {
 
 // 输入路径 4:屏幕选区(仅桌面版;浏览器无 Tauri IPC)
 const isTauri = '__TAURI_INTERNALS__' in window
+let lastRegionPngBase64 = ''
 if (isTauri) {
   regionButton.hidden = false
   regionButton.addEventListener('click', () => {
@@ -198,6 +209,7 @@ if (isTauri) {
     })
   })
   void listen<string>('region-captured', event => {
+    lastRegionPngBase64 = event.payload
     log('region', `收到选区截图(base64 ${event.payload.length} 字符),进入识别管线`)
     const bin = atob(event.payload)
     const bytes = new Uint8Array(bin.length)

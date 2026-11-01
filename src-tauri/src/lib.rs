@@ -136,6 +136,17 @@ fn close_all_overlays(app: &AppHandle) {
     }
 }
 
+fn set_main_window_visible(app: &AppHandle, visible: bool) {
+    if let Some(window) = app.get_webview_window("main") {
+        let result = if visible { window.show() } else { window.hide() };
+        if let Err(e) = result {
+            log_event(app, "capture", &format!("主窗显隐失败:{e}"));
+        } else {
+            log_event(app, "capture", &format!("主窗{}", if visible { "已恢复显示" } else { "已隐藏(避免污染选区画面)" }));
+        }
+    }
+}
+
 /// 逐屏截屏 → 存状态 → 每个显示器开一个遮罩窗口(均可独立框选)。
 /// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
 /// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
@@ -143,6 +154,8 @@ fn close_all_overlays(app: &AppHandle) {
 async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
     let t0 = Instant::now();
     log_event(&app, "capture", "开始屏幕截取");
+    // 先隐藏主窗:它不属于可选内容,且避免紫色 UI 出现在选区画面里
+    set_main_window_visible(&app, false);
     let captures = capture_all_screens()?;
     let count = captures.len();
     for (i, sc) in captures.iter().enumerate() {
@@ -212,11 +225,12 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
 async fn show_overlay(app: AppHandle, index: usize) -> Result<(), String> {
     let label = format!("region-overlay-{index}");
     match app.get_webview_window(&label) {
-        Some(window) => {
-            window.show().map_err(|e| e.to_string())?;
-            log_event(&app, "capture", &format!("遮罩窗 {label} 已显示(淡入)"));
-            Ok(())
-        }
+    Some(window) => {
+        window.show().map_err(|e| e.to_string())?;
+        let _ = window.set_always_on_top(true);
+        log_event(&app, "capture", &format!("遮罩窗 {label} 已显示(淡入)"));
+        Ok(())
+    }
         None => {
             log_event(&app, "capture", &format!("show_overlay:{label} 不存在"));
             Err(format!("{label} 不存在"))
@@ -253,6 +267,7 @@ async fn finish_capture(
     log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
     *state.0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
+    set_main_window_visible(&app, true);
     app.emit("region-captured", png_base64)
         .map_err(|e| e.to_string())
 }
@@ -263,7 +278,28 @@ async fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Resul
     log_event(&app, "capture", "选区取消");
     *state.0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
+    set_main_window_visible(&app, true);
     Ok(())
+}
+
+/// 识别失败的选区样张落盘(仅本地日志目录,用于定位裁剪内容问题)
+#[tauri::command]
+async fn dump_failed_region(
+    app: AppHandle,
+    state: State<'_, CaptureState>,
+    png_base64: String,
+) -> Result<String, String> {
+    let dir = log_file_path(&app)
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("failed-region-{}.png", LocalTime::now().format("%H%M%S%.3f")));
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&png_base64)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    log_event(&app, "capture", &format!("识别失败的选区样张已保存:{}", path.display()));
+    Ok(path.display().to_string())
 }
 
 /// 前端日志批量落盘(FR-10)
@@ -297,7 +333,8 @@ pub fn run() {
             finish_capture,
             cancel_capture,
             append_log,
-            show_overlay
+            show_overlay,
+            dump_failed_region
         ])
         .run(tauri::generate_context!())
         .expect("QrTool 运行失败");
