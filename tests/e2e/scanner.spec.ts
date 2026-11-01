@@ -4,7 +4,6 @@ import { expect, test } from '@playwright/test'
 import { pasteImage, qrPng, solidPng } from './helpers'
 
 const RESULT_TEXT = '[data-testid="result-text"]'
-const HISTORY_TOGGLE = /最近识别/
 
 test.describe('二维码识别 · E2E(localhost)', () => {
   test.beforeEach(async ({ page }) => {
@@ -15,7 +14,8 @@ test.describe('二维码识别 · E2E(localhost)', () => {
   test('页面加载:空态与关键元素齐全', async ({ page }) => {
     await expect(page.getByTestId('dropzone')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeVisible()
-    await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(0\)/)
+    // 识别 Tab 不再设"最近识别"底部条(结果卡片区即历史)
+    await expect(page.getByTestId('history-toggle')).toHaveCount(0)
     // 浏览器形态:屏幕选区按钮隐藏(仅桌面版提供)
     await expect(page.getByTestId('region-button')).toBeHidden()
   })
@@ -25,7 +25,6 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/e2e-url')
     await expect(page.getByTestId('copy-button')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeHidden()
-    await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(1\)/)
   })
 
   test('一图多码:全部识别(验收标准:一图三码)', async ({ page }) => {
@@ -42,30 +41,6 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.locator('.result-card.fail')).toContainText('未识别到二维码')
     await pasteImage(page, qrPng(['https://example.com/after-fail']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/after-fail')
-  })
-
-  test('识别历史:计数、展开、外部收起、回显、清空记录与历史', async ({ page }) => {
-    await pasteImage(page, qrPng(['https://example.com/history-1']))
-    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/history-1')
-
-    await page.getByRole('button', { name: HISTORY_TOGGLE }).click()
-    await expect(page.getByTestId('history-item')).toHaveCount(1)
-
-    // 点击面板外部自动收起
-    await page.getByTestId('dropzone').click()
-    await expect(page.getByTestId('history-list')).toBeHidden()
-
-    // 点击条目回显,面板自动收起
-    await page.getByRole('button', { name: HISTORY_TOGGLE }).click()
-    await page.getByTestId('history-item').first().click()
-    await expect(page.locator(RESULT_TEXT).first()).toHaveText('https://example.com/history-1')
-    await expect(page.getByTestId('history-list')).toBeHidden()
-
-    // WebView2 无原生 confirm:清空为二次点击确认;结果卡片与历史一并清空
-    await page.getByTestId('history-clear').click()
-    await page.getByTestId('history-clear').click()
-    await expect(page.getByRole('button', { name: /最近识别\(0\)/ })).toBeVisible()
-    await expect(page.getByTestId('empty-hint')).toBeVisible()
   })
 
   test('文件选择对话框路径(多选)', async ({ page }) => {

@@ -148,12 +148,12 @@ test.describe('生成 Tab · 深度自定义与美化', () => {
     await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(0\)/)
   })
 
-  test('识别历史与生成历史相互独立', async ({ page }) => {
+  test('生成历史独立计数(识别 Tab 已无最近识别条)', async ({ page }) => {
     await page.fill('#gen-text', TEXT)
     await expect(page.getByTestId('scan-badge')).toHaveText(/✓ 可扫/, { timeout: 10_000 })
     const [download] = await Promise.all([page.waitForEvent('download'), page.click('#gen-png')])
     await download.path()
     await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(1\)/)
-    await expect(page.getByTestId('history-toggle')).toHaveText(/最近识别\(0\)/)
+    await expect(page.getByTestId('history-toggle')).toHaveCount(0)
   })
 })

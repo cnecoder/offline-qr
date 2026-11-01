@@ -46,7 +46,7 @@
       <div id="panel-scan" class="panel" data-testid="panel-scan">
         <section id="dropzone" class="toolbar" data-testid="dropzone">
           <button id="pick-button" class="primary" data-testid="pick-button">选择图片</button>
-          <button id="region-button" data-testid="region-button" hidden>屏幕选区</button>
+          <button id="region-button" class="primary" data-testid="region-button" hidden>屏幕选区</button>
           <span class="toolbar-hint">拖拽 / Ctrl+V 粘贴 / 全局 Alt+Q 屏幕选区</span>
           <input id="file-input" type="file" accept="image/*" multiple hidden />
         </section>
@@ -67,14 +67,6 @@
             <p class="empty-sub">粘贴、拖拽或选择含二维码的图片</p>
           </div>
         </main>
-
-        <section class="history">
-          <div class="history-bar">
-            <button id="history-toggle" class="history-toggle" data-testid="history-toggle" aria-expanded="false">最近识别(0)</button>
-            <button id="history-clear" class="link-button" data-testid="history-clear" hidden>清空</button>
-          </div>
-          <ul id="history-list" class="history-list" data-testid="history-list" hidden></ul>
-        </section>
       </div>
 
       <!-- 生成面板 -->

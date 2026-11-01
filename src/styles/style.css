@@ -219,12 +219,12 @@ button.primary:hover {
 }
 .thumb {
   width: 44px;
-  height: 44px;
+  align-self: stretch;
+  min-height: 44px;
   border-radius: var(--r-sm);
   object-fit: cover;
   background: var(--surface-2);
   flex-shrink: 0;
-  align-self: center;
 }
 .card-body {
   flex: 1;

@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { initGeneratePanel } from './generator/panel'
 import { createEngine } from './scanner/engine'
-import { createHistoryStore } from './scanner/history'
 import { createIngest, isImageFile } from './scanner/ingest'
 import { createSerialQueue } from './scanner/queue'
 import { renderResults, selectTextContents, type ResultItem } from './scanner/results'
@@ -37,15 +36,11 @@ const progressEl = document.getElementById('progress') as HTMLElement
 const resultsEl = document.getElementById('results') as HTMLElement
 const emptyHint = document.getElementById('empty-hint') as HTMLElement
 const toastEl = document.getElementById('toast') as HTMLElement
-const historyToggle = document.getElementById('history-toggle') as HTMLButtonElement
-const historyClear = document.getElementById('history-clear') as HTMLButtonElement
-const historyList = document.getElementById('history-list') as HTMLUListElement
 
 const engine = createEngine()
 const ingest = createIngest()
 const queue = createSerialQueue()
 const progress = createProgress(progressEl)
-const history = createHistoryStore({ storage: localStorage })
 
 // 配色主题:黑绿/黑黄切换,持久化到 localStorage(首帧前由 index.html 内联脚本应用)
 const themeToggle = document.getElementById('theme-toggle') as HTMLButtonElement
@@ -60,8 +55,6 @@ syncThemeButton()
 
 const items: ResultItem[] = []
 let uidCounter = 0
-// 识别结果纪元:清空时递增,在途识别结果据此作废(不再写入历史)
-let itemsEpoch = 0
 // 最新完成识别的条目:结果卡片着重显示
 let latestDoneId = ''
 let toastTimer: number | undefined
@@ -119,7 +112,6 @@ function findItem(id: string): ResultItem | undefined {
 
 async function decodeItem(uid: string, file: File): Promise<void> {
   const t0 = performance.now()
-  const epoch = itemsEpoch
   try {
     const task = await ingest.fromBlob(file, file.name)
     const item = findItem(uid)
@@ -141,11 +133,6 @@ async function decodeItem(uid: string, file: File): Promise<void> {
     }
     latestDoneId = uid
     log('scan', `解码完成 ${Math.round(performance.now() - t0)}ms,结果 ${texts.length} 条`)
-    // 清空已发生时丢弃迟到的识别结果,不再写入历史
-    if (texts.length > 0 && epoch === itemsEpoch) {
-      for (const text of texts) history.add(text)
-      renderHistory()
-    }
   } catch (err) {
     const target = findItem(uid)
     if (target) {
@@ -258,100 +245,3 @@ if (isTauri) {
     enqueueFiles([new File([bytes], '屏幕选区.png', { type: 'image/png' })], '屏幕选区')
   })
 }
-
-// 识别历史:折叠面板 + 点击回显
-let historyOpen = false
-let recallCounter = 0
-
-const pad = (n: number): string => String(n).padStart(2, '0')
-function formatTime(ts: number): string {
-  const d = new Date(ts)
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-function renderHistory(): void {
-  const entries = history.all()
-  historyToggle.textContent = `最近识别(${entries.length})`
-  historyToggle.setAttribute('aria-expanded', String(historyOpen))
-  historyClear.hidden = entries.length === 0
-  historyList.hidden = !historyOpen || entries.length === 0
-  historyList.replaceChildren()
-  for (const entry of entries) {
-    const li = document.createElement('li')
-    li.dataset.testid = 'history-item'
-    li.title = entry.text
-    const text = document.createElement('span')
-    text.className = 'history-text'
-    text.textContent = entry.text
-    const time = document.createElement('span')
-    time.className = 'history-time'
-    time.textContent = formatTime(entry.at)
-    li.append(text, time)
-    li.addEventListener('click', () => {
-      recallEntry(entry.text)
-      historyOpen = false
-      renderHistory()
-    })
-    historyList.append(li)
-  }
-}
-
-function recallEntry(text: string): void {
-  const rid = `recall-${++recallCounter}`
-  latestDoneId = rid
-  items.unshift({
-    id: rid,
-    name: '历史记录',
-    thumb: '',
-    state: 'done',
-    texts: [text],
-    source: '历史回显',
-    completedAt: Date.now(),
-  })
-  refresh()
-  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-}
-
-historyToggle.addEventListener('click', () => {
-  historyOpen = !historyOpen
-  renderHistory()
-})
-// 点击面板外部任意处自动收起历史面板
-document.addEventListener('pointerdown', event => {
-  if (!historyOpen) return
-  const node = event.target as Node
-  if (historyList.contains(node) || historyToggle.contains(node) || historyClear.contains(node)) return
-  historyOpen = false
-  renderHistory()
-})
-// WebView2 默认禁用原生脚本对话框,window.confirm 恒返回 false(清空从未执行)——
-// 改用应用内二次点击确认,3 秒未确认自动解除
-let clearArmed = false
-let clearArmTimer: number | undefined
-function disarmHistoryClear(): void {
-  clearArmed = false
-  window.clearTimeout(clearArmTimer)
-  historyClear.textContent = '清空'
-  historyClear.classList.remove('danger')
-}
-historyClear.addEventListener('click', () => {
-  if (!clearArmed) {
-    clearArmed = true
-    historyClear.textContent = '再点一次确认清空'
-    historyClear.classList.add('danger')
-    clearArmTimer = window.setTimeout(disarmHistoryClear, 3000)
-    return
-  }
-  disarmHistoryClear()
-  history.clear()
-  // 结果卡片区即"识别记录":与历史一并清空回到空态;在途识别结果作废
-  itemsEpoch++
-  latestDoneId = ''
-  items.length = 0
-  refresh()
-  refreshProgress()
-  renderHistory()
-  flashToast('已清空识别记录与历史')
-})
-
-renderHistory()
