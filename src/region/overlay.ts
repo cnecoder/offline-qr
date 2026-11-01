@@ -27,6 +27,8 @@ async function resolveIndex(): Promise<number> {
 
 /** 遮罩窗口:全屏显示截屏,拖拽选区后裁剪回传主窗 */
 async function boot(): Promise<void> {
+  // 双保险:移除静态应用 UI(head 脚本已按 label 隐藏)
+  document.querySelector('.app')?.remove()
   const t0 = performance.now()
   const index = await resolveIndex()
   log('overlay', `启动:index=${index},视口 ${window.innerWidth}x${window.innerHeight},dpr=${window.devicePixelRatio}`)

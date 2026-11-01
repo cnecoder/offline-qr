@@ -28,6 +28,10 @@
 
 [hidden] { display: none !important; }
 
+/* 遮罩窗口模式:应用 UI 从解析期就不渲染,仅保留选区层 */
+html.overlay-mode { background: #000; }
+html.overlay-mode .app { display: none; }
+
 html, body { height: 100%; }
 
 body {
