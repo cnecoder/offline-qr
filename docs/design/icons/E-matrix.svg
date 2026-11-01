@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- 备选:候选 E「矩阵渐隐」 -->
+  <defs>
+    <linearGradient id="g-dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B1F27"/><stop offset="1" stop-color="#0B0C0F"/>
+    </linearGradient>
+    <linearGradient id="g-fade" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0.15" stop-color="#FFFFFF"/><stop offset="1" stop-color="#3A404C"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="29" fill="url(#g-dark)"/>
+  <g fill="url(#g-fade)">
+    <rect x="20" y="20" width="16" height="16" rx="4.5"/>
+    <rect x="44" y="20" width="16" height="16" rx="4.5"/>
+    <rect x="92" y="20" width="16" height="16" rx="4.5"/>
+    <rect x="20" y="44" width="16" height="16" rx="4.5"/>
+    <rect x="68" y="44" width="16" height="16" rx="4.5"/>
+    <rect x="92" y="44" width="16" height="16" rx="4.5"/>
+    <rect x="44" y="68" width="16" height="16" rx="4.5"/>
+    <rect x="68" y="68" width="16" height="16" rx="4.5"/>
+    <rect x="92" y="68" width="16" height="16" rx="4.5"/>
+    <rect x="20" y="92" width="16" height="16" rx="4.5"/>
+    <rect x="68" y="92" width="16" height="16" rx="4.5"/>
+  </g>
+  <rect x="20" y="20" width="16" height="16" rx="4.5" fill="#FFFFFF"/>
+  <rect x="92" y="20" width="16" height="16" rx="4.5" fill="#FFFFFF"/>
+</svg>
