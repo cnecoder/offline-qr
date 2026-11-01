@@ -1,8 +1,7 @@
 use std::io::{Cursor, Write as _};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::sync::{Mutex, OnceLock};
+use std::time::Instant;
 
 use base64::Engine as _;
 use chrono::Local as LocalTime;
@@ -137,36 +136,6 @@ fn close_all_overlays(app: &AppHandle) {
     }
 }
 
-/// 主窗显隐:必须在主线程上执行(跨线程 ShowWindow 时序不可控,曾导致主窗
-/// "幽灵副本"被截进截图);执行完成以标志位确认,调用方等待后再继续。
-fn set_main_window_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
-    let done = Arc::new(AtomicBool::new(false));
-    let flag = done.clone();
-    let handle = app.clone();
-    app.run_on_main_thread(move || {
-        if let Some(window) = handle.get_webview_window("main") {
-            let result = if visible { window.show() } else { window.hide() };
-            match result {
-                Ok(_) => log_event(&handle, "capture", &format!("主窗{}", if visible { "已恢复显示" } else { "已隐藏(避免污染选区画面)" })),
-                Err(e) => log_event(&handle, "capture", &format!("主窗显隐失败:{e}")),
-            }
-        } else {
-            log_event(&handle, "capture", "未找到主窗(label 不匹配)");
-        }
-        flag.store(true, Ordering::SeqCst);
-    })
-    .map_err(|e| e.to_string())?;
-    let t0 = Instant::now();
-    while !done.load(Ordering::SeqCst) {
-        if t0.elapsed() > Duration::from_millis(500) {
-            log_event(&app, "capture", "主窗显隐确认超时");
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    Ok(())
-}
-
 /// 逐屏截屏 → 存状态 → 每个显示器开一个遮罩窗口(均可独立框选)。
 /// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
 /// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
@@ -174,9 +143,6 @@ fn set_main_window_visible(app: &AppHandle, visible: bool) -> Result<(), String>
 async fn start_capture(app: AppHandle) -> Result<(), String> {
     let t0 = Instant::now();
     log_event(&app, "capture", "开始屏幕截取");
-    // 先隐藏主窗(主线程执行 + 等待完成):它不属于可选内容,且避免紫色 UI 出现在选区画面里
-    set_main_window_visible(&app, false)?;
-    log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
     let captures = capture_all_screens()?;
     let count = captures.len();
     for (i, sc) in captures.iter().enumerate() {
@@ -208,7 +174,6 @@ async fn start_capture(app: AppHandle) -> Result<(), String> {
         .resizable(false)
         .always_on_top(true)
         .skip_taskbar(true)
-        .visible(false)
         .background_color(tauri::window::Color(0, 0, 0, 255))
         .position(screen.x, screen.y)
         .inner_size(screen.w, screen.h)
@@ -221,7 +186,7 @@ async fn start_capture(app: AppHandle) -> Result<(), String> {
             &app,
             "capture",
             &format!(
-                "遮罩窗 {label} 已创建(隐藏,避免开窗展开动画),({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
+                "遮罩窗 {label} 已创建(即时可见,黑色首帧),({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
                 screen.x,
                 screen.y,
                 screen.w,
@@ -239,25 +204,6 @@ async fn start_capture(app: AppHandle) -> Result<(), String> {
         ),
     );
     Ok(())
-}
-
-/// 遮罩窗内容与位图就绪后由前端调用:显示窗口。隐藏创建 + 就绪后显示,
-/// 可避免 Windows 对"创建即可见"窗口的开窗展开动画(用户反馈的紫色一闪)。
-#[tauri::command]
-async fn show_overlay(app: AppHandle, index: usize) -> Result<(), String> {
-    let label = format!("region-overlay-{index}");
-    match app.get_webview_window(&label) {
-    Some(window) => {
-        window.show().map_err(|e| e.to_string())?;
-        let _ = window.set_always_on_top(true);
-        log_event(&app, "capture", &format!("遮罩窗 {label} 已显示(淡入)"));
-        Ok(())
-    }
-        None => {
-            log_event(&app, "capture", &format!("show_overlay:{label} 不存在"));
-            Err(format!("{label} 不存在"))
-        }
-    }
 }
 
 /// 遮罩窗启动时取回自己那一屏的截屏数据(按窗口序号)
@@ -287,7 +233,6 @@ async fn finish_capture(app: AppHandle, png_base64: String) -> Result<(), String
     log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
     *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
-    let _ = set_main_window_visible(&app, true);
     app.emit("region-captured", png_base64)
         .map_err(|e| e.to_string())
 }
@@ -298,7 +243,6 @@ async fn cancel_capture(app: AppHandle) -> Result<(), String> {
     log_event(&app, "capture", "选区取消");
     *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
-    let _ = set_main_window_visible(&app, true);
     Ok(())
 }
 
@@ -349,7 +293,6 @@ pub fn run() {
             finish_capture,
             cancel_capture,
             append_log,
-            show_overlay,
             dump_failed_region
         ])
         .run(tauri::generate_context!())
