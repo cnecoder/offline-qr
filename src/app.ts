@@ -122,7 +122,10 @@ async function decodeItem(uid: string, file: File): Promise<void> {
     }
   } catch (err) {
     const target = findItem(uid)
-    if (target) target.state = 'failed'
+    if (target) {
+      target.state = 'failed'
+      target.error = err instanceof Error ? err.message : String(err)
+    }
     log('scan', `识别失败:${err instanceof Error ? err.message : String(err)}`)
   }
   // 屏幕选区识别失败(异常或 0 结果):把裁剪样张落盘,便于核对引擎实际看到的内容

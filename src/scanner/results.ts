@@ -9,6 +9,8 @@ export interface ResultItem {
   state: ResultState
   /** state=done 时的识别文本(一图多码为多条) */
   texts: string[]
+  /** state=failed 时的真实原因(引擎异常等);缺省 = 解码正常但未发现二维码 */
+  error?: string
 }
 
 export interface ResultHandlers {
@@ -44,7 +46,14 @@ export function renderCard(item: ResultItem, handlers: ResultHandlers = {}): HTM
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else if (item.state === 'failed') {
-    body.append(message('未识别到二维码(请确认选区完整包含二维码及其四周留白)'))
+    // 引擎异常时直接给出真实原因,避免误导用户去检查选区完整性
+    body.append(
+      message(
+        item.error
+          ? `识别异常:${item.error}`
+          : '未识别到二维码(请确认选区完整包含二维码及其四周留白)',
+      ),
+    )
   } else {
     for (const text of item.texts) body.append(textBlock(text, handlers))
   }

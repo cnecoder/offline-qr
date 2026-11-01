@@ -43,6 +43,11 @@ describe('renderCard', () => {
     expect(card.querySelector('[data-testid="open-link"]')).toBeNull()
   })
 
+  it('failed 卡带 error:显示真实原因而非选区引导', () => {
+    const card = renderCard(item({ state: 'failed', texts: [], error: '识别引擎异常终止' }))
+    expect(card.querySelector('.card-msg')?.textContent).toBe('识别异常:识别引擎异常终止')
+  })
+
   it('pending 卡:显示识别中', () => {
     const card = renderCard(item({ state: 'pending', thumb: '' }))
     expect(card.querySelector('.card-msg')?.textContent).toBe('识别中…')

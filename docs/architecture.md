@@ -242,6 +242,7 @@ GenContent(text | wifi | vcard,表单状态)
 | 选区含码却报未识别(v1.2.0) | 区域截图裁剪链路无诊断,WebView2 行为差异不可预知 | 全链路日志(视口/DPR/尺寸/裁剪/回传);裁剪改 ImageBitmap;失败样张落盘 |
 | 主窗"幽灵副本"进入截图(v1.2.1-dev) | 主窗 hide 为异步派发,截屏线程先行,像素取证证实幽灵为 35% 暗化副本 | 显隐改为主线程同步执行(run_on_main_thread + 标志位确认);遮罩黑色底全程不透明,仅淡入截图内容 |
 | 主窗 hide 后截屏仍带"半透明残影"(v1.2.1-dev 复测) | hide 仅改窗口标志,DWM 下一合成帧才把窗口移出桌面画面,GDI BitBlt 取已合成帧;窗口标志/is_visible 无法感知合成时机,浏览器内自动化测试完全不可达 | hide 确认后固定等待 150ms(约 9 合成帧)再截屏;日志记录隐藏→截屏间隔,人工 smoke 验证 |
+| 选区识别在内嵌资源构建全挂、dev 全绿(v1.2.1-dev) | CSP 仅生产(custom-protocol)构建注入,vitest/E2E 从不经过 CSP;CSP 缺 worker-src 时 Blob 内联 Worker 被拦,Worker 立即死亡 | CSP 约束固化为守卫单测(src/tauri-csp.test.ts:blob worker / wasm-unsafe-eval / img data:);发布前人工 smoke 必含"选区识别 + 粘贴识别";失败卡显示真实引擎错误 |
 
 结论:OS/窗口层以"结构化日志 + 人工 smoke 清单"兜底;纯逻辑一律补单测。
 
