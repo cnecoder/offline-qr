@@ -1,14 +1,17 @@
-# Release:推送 v* tag 后自动构建三平台产物并创建 GitHub Release。
-# - Windows: NSIS 安装包
+# Release:双产品线 tag 触发自动构建三平台产物并创建 GitHub Release。
+# - v*          → 全功能线  OfflineQR(recognition-generation 分支)
+# - scanner-v*  → 仅识别线  OfflineQRScanner(recognition 分支)
+# - Windows: NSIS 安装包 + 绿色版 zip
 # - Linux:   AppImage / deb
 # - macOS:   dmg (Apple Silicon;如需 Intel 可在 matrix 中追加 --target x86_64-apple-darwin)
-# 注意:tag 必须与 src-tauri/tauri.conf.json 的 version 一致(工作流内有守卫)。
+# 注意:tag 中携带的版本必须与该提交 src-tauri/tauri.conf.json 的 version 一致(工作流内有守卫);
+#       测试不在此工作流——CI(push/PR)按分支跑各自用例集,发版前额外执行一次单测兜底。
 # 本地代理(HTTPS_PROXY)仅本机开发需要;CI 到 GitHub 网络畅通,无需代理。
 name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ['v*', 'scanner-v*']
 
 permissions:
   contents: write
@@ -55,14 +58,34 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Resolve product from tag prefix
+        id: meta
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ "$TAG" == scanner-v* ]]; then
+            echo "version=${TAG#scanner-v}"   >> "$GITHUB_OUTPUT"
+            echo "release_name=OfflineQRScanner $TAG" >> "$GITHUB_OUTPUT"
+          elif [[ "$TAG" == v* ]]; then
+            echo "version=${TAG#v}"           >> "$GITHUB_OUTPUT"
+            echo "release_name=OfflineQR $TAG" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::不支持的 tag 格式:$TAG(应为 v* 或 scanner-v*)"
+            exit 1
+          fi
+
       - name: Check tag matches app version
         shell: bash
         run: |
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ "v$VERSION" != "${{ github.ref_name }}" ]; then
+          if [ "$VERSION" != "${{ steps.meta.outputs.version }}" ]; then
             echo "::error::tag ${{ github.ref_name }} 与 tauri.conf.json version v$VERSION 不一致"
             exit 1
           fi
+
+      - name: Run unit tests
+        run: npm test
 
       - name: Build and upload release assets
         uses: tauri-apps/tauri-action@v0
@@ -70,8 +93,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'OfflineQR ${{ github.ref_name }}'
-          releaseBody: '离线二维码识别与生成工具。见 Assets 下载对应平台安装包。'
+          releaseName: ${{ steps.meta.outputs.release_name }}
+          releaseBody: '完全离线的二维码工具。见 Assets 下载对应平台安装包。'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -86,8 +109,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          gh release upload "${{ github.ref_name }}" "src-tauri/target/release/bundle/portable/OfflineQRScanner_${VERSION}_portable_x64.zip" --clobber
+          gh release upload "${{ github.ref_name }}" src-tauri/target/release/bundle/portable/*_portable_x64.zip --clobber
 
       - name: Collect failed-step logs
         if: failure()
