@@ -1,6 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { getCurrentWindow } from '@tauri-apps/api/window'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { initGeneratePanel } from './generator/panel'
 import { createEngine } from './scanner/engine'
@@ -348,25 +347,4 @@ if (isTauri) {
       appRoot.classList.remove('dragging')
     }
   })
-  // 自绘窗口控制(无边框透明窗):最小化/最大化/关闭;最大化时去圆角贴合屏幕
-  const win = getCurrentWindow()
-  const winControls = document.getElementById('win-controls') as HTMLElement
-  winControls.hidden = false
-  document.getElementById('win-min')?.addEventListener('click', () => void win.minimize())
-  document.getElementById('win-max')?.addEventListener('click', () => void win.toggleMaximize())
-  document.getElementById('win-close')?.addEventListener('click', () => void win.close())
-  const applyMaximized = async (): Promise<void> => {
-    document.body.classList.toggle('maximized', await win.isMaximized())
-  }
-  void win.onResized(() => void applyMaximized())
-  void applyMaximized()
-  // 构建标记移入自绘标题栏
-  void invoke<string>('build_info')
-    .then(info => {
-      const marker = document.getElementById('build-marker')
-      if (!marker) return
-      marker.textContent = `[${info}]`
-      marker.hidden = false
-    })
-    .catch(() => {})
 }
