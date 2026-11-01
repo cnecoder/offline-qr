@@ -52,19 +52,19 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else {
-    // meta 行:"最新"徽标 + 来源与完成时间(年月日 时:分:秒)
+    // meta 行:时间在前、来源在后、"最新"徽标殿后——各卡片前缀信息保持对齐
     const meta = document.createElement('div')
     meta.className = 'card-meta'
-    if (isLatest) meta.append(latestChip())
     if (item.completedAt) {
       const stamp = document.createElement('span')
-      stamp.textContent = [item.source, formatDateTime(item.completedAt)].filter(Boolean).join(' · ')
+      stamp.textContent = [formatDateTime(item.completedAt), item.source].filter(Boolean).join(' · ')
       meta.append(stamp)
     } else if (item.source) {
       const stamp = document.createElement('span')
       stamp.textContent = item.source
       meta.append(stamp)
     }
+    if (isLatest) meta.append(latestChip())
     if (meta.childElementCount > 0) body.append(meta)
 
     if (item.state === 'failed') {
@@ -87,30 +87,32 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
 /** 选中文本块全部内容(供"识别完成默认全选"复用;用户仍可鼠标部分选择) */
 export function selectTextContents(el: HTMLElement): void {
   const range = document.createRange()
-  range.selectNodeContents(el)
+  // 优先选中内层文本行:避开块级边界的换行序列化(Ctrl+C 会带上尾部空行)
+  const line = el.querySelector<HTMLElement>('.result-line')
+  range.selectNodeContents(line ?? el)
   const selection = window.getSelection()
   if (!selection) return
   selection.removeAllRanges()
   selection.addRange(range)
 }
 
-/** 单条文本行:撑满卡片高度的文本块 + 右侧复制按钮 */
+/** 单条文本行:默认单行省略(卡片等高),点击展开全部 + 右侧复制按钮 */
 function textRow(text: string, options: ResultRenderOptions): HTMLElement {
   const row = document.createElement('div')
   row.className = 'result-row'
 
   const pre = document.createElement('p')
-  pre.className = 'result-text'
+  pre.className = 'result-text collapsed'
   pre.dataset.testid = 'result-text'
-  pre.textContent = text
-  if (text.length > COLLAPSE_LENGTH || text.includes('\n')) {
-    pre.classList.add('collapsed')
-    // 点击展开;点击文本块外任意位置收起(统一绑定,见 bindTextInteractions)
-    pre.addEventListener('click', () => {
-      pre.classList.remove('collapsed')
-      pre.classList.add('expanded')
-    })
-  }
+  const line = document.createElement('span')
+  line.className = 'result-line'
+  line.textContent = text
+  pre.append(line)
+  // 点击展开;点击文本块外任意位置收起(统一绑定,见 bindTextInteractions)
+  pre.addEventListener('click', () => {
+    pre.classList.remove('collapsed')
+    pre.classList.add('expanded')
+  })
   row.append(pre)
 
   const actions = document.createElement('div')
@@ -179,9 +181,6 @@ function bindTextInteractions(): void {
     true,
   )
 }
-
-/** 超过该长度或含换行的文本默认折叠,点击展开 */
-const COLLAPSE_LENGTH = 80
 
 // 模块加载即绑定(幂等):应用与测试环境行为一致
 bindTextInteractions()

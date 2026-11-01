@@ -116,8 +116,8 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
     expect(selected).toBe('https://example.com/auto-select')
     await expect(page.locator('.result-card.latest')).toHaveCount(1)
-    // meta 行:来源(粘贴)+ 年月日 时:分:秒
-    await expect(page.locator('.card-meta').first()).toHaveText(/粘贴 · \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+    // meta 行:时间在前(年月日 时:分:秒)、来源在后
+    await expect(page.locator('.card-meta').first()).toHaveText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} · 粘贴/)
   })
 })
 

@@ -40,11 +40,22 @@ describe('renderCard', () => {
     expect(card.querySelector('.card-msg')?.textContent).toBe('识别异常:识别引擎异常终止')
   })
 
-  it('done 卡:meta 行标注来源与完成时间(年月日 时:分:秒)', () => {
-    const card = renderCard(item({ source: '屏幕选区', completedAt: new Date(2026, 10, 1, 18, 23, 45).getTime() }))
-    const meta = card.querySelector('.card-meta')
-    expect(meta?.textContent).toContain('屏幕选区')
-    expect(meta?.textContent).toContain('2026-11-01 18:23:45')
+  it('done 卡:meta 行 时间在前、来源在后、"最新"徽标殿后', () => {
+    const card = renderCard(
+      item({ source: '屏幕选区', completedAt: new Date(2026, 10, 1, 18, 23, 45).getTime() }),
+      { latestId: 't1' },
+    )
+    const meta = card.querySelector('.card-meta')!
+    const text = meta.textContent ?? ''
+    expect(text).toContain('2026-11-01 18:23:45')
+    expect(text).toContain('屏幕选区')
+    expect(text.indexOf('2026-11-01 18:23:45')).toBeLessThan(text.indexOf('屏幕选区'))
+    expect(meta.lastElementChild?.className).toBe('latest-chip')
+  })
+
+  it('done 卡:文本默认单行(卡片等高)', () => {
+    const card = renderCard(item({ texts: ['short'] }))
+    expect(card.querySelector('.result-text')?.classList.contains('collapsed')).toBe(true)
   })
 
   it('pending 卡:无 meta 行', () => {
