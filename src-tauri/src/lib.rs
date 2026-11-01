@@ -8,6 +8,7 @@ use base64::Engine as _;
 use chrono::Local as LocalTime;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, Shortcut, ShortcutState};
 
 static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
@@ -332,11 +333,66 @@ async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize)]
+struct ReadImageFile {
+    path: String,
+    name: String,
+    ok: bool,
+    base64: String,
+    error: String,
+}
+
+/// 原生文件对话框选图(桌面):返回完整路径;WebView2 不向网页暴露文件路径,
+/// 必须经原生通道获取。取消/未选返回空列表。
+#[tauri::command]
+async fn pick_image_files(app: AppHandle) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let files = app
+            .dialog()
+            .file()
+            .add_filter("图片", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
+            .blocking_pick_files();
+        Ok(files.unwrap_or_default().iter().map(|f| f.to_string()).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 按路径读取图片文件(桌面拖放/对话框路径 → base64;原生拖放事件只给路径不给句柄)
+#[tauri::command]
+async fn read_image_files(paths: Vec<String>) -> Result<Vec<ReadImageFile>, String> {
+    let mut results = Vec::new();
+    for path in paths {
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.clone());
+        match std::fs::read(&path) {
+            Ok(bytes) => results.push(ReadImageFile {
+                path: path.clone(),
+                name,
+                ok: true,
+                base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+                error: String::new(),
+            }),
+            Err(e) => results.push(ReadImageFile {
+                path: path.clone(),
+                name,
+                ok: false,
+                base64: String::new(),
+                error: e.to_string(),
+            }),
+        }
+    }
+    Ok(results)
+}
+
 // 壳负责窗口/打包/截屏:识别与生成等业务全部在前端完成。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(CaptureState::default())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             GlobalShortcutBuilder::new()
                 .with_handler(|app, shortcut, event| {
@@ -412,7 +468,9 @@ pub fn run() {
             finish_capture,
             cancel_capture,
             append_log,
-            dump_failed_region
+            dump_failed_region,
+            pick_image_files,
+            read_image_files
         ])
         .run(tauri::generate_context!())
         .expect("QrTool 运行失败");

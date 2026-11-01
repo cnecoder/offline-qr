@@ -110,8 +110,11 @@ Rust(finish/cancel):关闭全部遮罩;finish 额外 emit "region-captured"(pngB
 - 交互:遮罩以 180ms 淡入呈现(截图位图就绪后触发),消除触发时的白闪。
 - 裁剪源使用 `createImageBitmap(image)` 位图(而非 `<img>` 元素直接 drawImage),
   规避 WebView2 下元素位图的不确定性;仅接受 dataURL 源,无画布污染风险。
-- 桌面壳窗口配置 `dragDropEnabled: false`:Tauri 原生拖放接管会吞掉 HTML5 drop 事件
-  (浏览器正常、exe 失效的根因);主窗走标准 HTML5 拖放(window 级 dragover/drop)。
+- 文件拖拽/选择双通道:浏览器走标准 HTML5 拖放与 input(拿不到文件路径,meta 只显示文件名);
+  桌面端 Tauri 原生拖放会吞掉 HTML5 drop 事件,故改用 `getCurrentWebview().onDragDropEvent`
+  (事件携带文件完整路径,高亮由 enter/leave 驱动),文件选择用原生对话框命令
+  `pick_image_files`(tauri-plugin-dialog,Rust 侧调用,无能力项),路径经
+  `read_image_files` 命令读回字节——WebView2 不向网页暴露文件路径,桌面端只能走原生通道。
 - WebView2 默认禁用原生脚本对话框,`window.confirm/alert` 恒返回 false:
   破坏性操作(清空历史等)一律用应用内二次点击确认,不依赖原生对话框。
 - 全局快捷键(`tauri-plugin-global-shortcut`,Rust 侧注册不占前端能力):

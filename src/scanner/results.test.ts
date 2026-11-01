@@ -62,6 +62,15 @@ describe('renderCard', () => {
     expect(renderCard(item({ state: 'pending', texts: [] })).querySelector('.card-meta')).toBeNull()
   })
 
+  it('done 卡:meta 行追加完整源文件路径并带 title 提示', () => {
+    const card = renderCard(
+      item({ source: '拖动', completedAt: new Date(2026, 10, 1, 18, 23, 45).getTime(), filePath: 'D:\\pics\\qr.png' }),
+    )
+    const stamp = card.querySelector('.card-meta-text')!
+    expect(stamp.textContent).toBe('2026-11-01 18:23:45 · 拖动 · D:\\pics\\qr.png')
+    expect(stamp.getAttribute('title')).toContain('D:\\pics\\qr.png')
+  })
+
   it('formatDateTime:补零的 年-月-日 时:分:秒', () => {
     expect(formatDateTime(new Date(2026, 0, 2, 3, 4, 5).getTime())).toBe('2026-01-02 03:04:05')
   })

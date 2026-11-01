@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { getCurrentWebview } from '@tauri-apps/api/webview'
 import { initGeneratePanel } from './generator/panel'
 import { createEngine } from './scanner/engine'
 import { createIngest, isImageFile } from './scanner/ingest'
@@ -110,6 +111,50 @@ function findItem(id: string): ResultItem | undefined {
   return items.find(it => it.id === id)
 }
 
+const IMAGE_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  bmp: 'image/bmp',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+
+/** 桌面:按路径读图(原生对话框/原生拖放);meta 行可显示完整源文件路径 */
+async function handleImagePaths(paths: string[], source: string): Promise<void> {
+  if (paths.length === 0) return
+  try {
+    const results = await invoke<
+      Array<{ path: string; name: string; ok: boolean; base64: string; error: string }>
+    >('read_image_files', { paths })
+    const files: File[] = []
+    const filePaths: string[] = []
+    for (const r of results) {
+      if (!r.ok) {
+        flashToast(`无法读取:${r.name}`)
+        log('scan', `读取文件失败:${r.path} ${r.error}`)
+        continue
+      }
+      const ext = r.name.split('.').pop()?.toLowerCase() ?? ''
+      const type = IMAGE_MIME[ext]
+      if (!type) {
+        flashToast(`不支持的图片格式:${r.name}`)
+        log('scan', `忽略非图片文件:${r.path}`)
+        continue
+      }
+      const bin = atob(r.base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      files.push(new File([bytes], r.name, { type }))
+      filePaths.push(r.path)
+    }
+    if (files.length > 0) enqueueFiles(files, source, filePaths)
+  } catch (err) {
+    log('scan', `读取图片失败:${String(err)}`)
+    flashToast('读取图片失败')
+  }
+}
+
 async function decodeItem(uid: string, file: File): Promise<void> {
   const t0 = performance.now()
   try {
@@ -167,7 +212,7 @@ async function decodeItem(uid: string, file: File): Promise<void> {
   }
 }
 
-function enqueueFiles(files: ArrayLike<File>, source: string): void {
+function enqueueFiles(files: ArrayLike<File>, source: string, filePaths?: string[]): void {
   const all = Array.from(files)
   const images = all.filter(isImageFile)
   if (images.length === 0) {
@@ -176,23 +221,43 @@ function enqueueFiles(files: ArrayLike<File>, source: string): void {
     return
   }
   log('scan', `入队 ${images.length} 张图片,来源 ${source}(忽略非图片 ${all.length - images.length} 个)`)
-  for (const file of images) {
+  for (const [index, file] of images.entries()) {
     const uid = `item-${++uidCounter}`
-    items.push({ id: uid, name: file.name, thumb: '', state: 'pending', texts: [], source })
+    items.push({
+      id: uid,
+      name: file.name,
+      thumb: '',
+      state: 'pending',
+      texts: [],
+      source,
+      filePath: filePaths?.[index],
+    })
     refresh()
     void queue.add(() => decodeItem(uid, file))
   }
   refreshProgress()
 }
 
-// 输入路径 1:文件选择(可多选)
-pickButton.addEventListener('click', () => fileInput.click())
-fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length > 0) enqueueFiles(fileInput.files, '文件')
-  fileInput.value = ''
-})
+// 输入路径 1:文件选择(浏览器:HTML input;桌面:原生对话框——WebView2 不向网页暴露文件路径)
+const isTauri = '__TAURI_INTERNALS__' in window
+if (isTauri) {
+  pickButton.addEventListener('click', () => {
+    void invoke<string[]>('pick_image_files')
+      .then(paths => handleImagePaths(paths, '文件'))
+      .catch(err => {
+        log('scan', `文件对话框失败:${String(err)}`)
+        flashToast('打开文件对话框失败')
+      })
+  })
+} else {
+  pickButton.addEventListener('click', () => fileInput.click())
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files.length > 0) enqueueFiles(fileInput.files, '文件')
+    fileInput.value = ''
+  })
+}
 
-// 输入路径 2:窗口级拖拽(高亮整窗)
+// 输入路径 2:窗口级拖拽(浏览器路径;桌面端 Tauri 原生拖放接管,不触发 HTML5 事件,见 isTauri 块)
 for (const type of ['dragenter', 'dragover'] as const) {
   window.addEventListener(type, (event: DragEvent) => {
     event.preventDefault()
@@ -224,8 +289,7 @@ document.addEventListener('paste', (event: ClipboardEvent) => {
   }
 })
 
-// 输入路径 4:屏幕选区(仅桌面版;浏览器无 Tauri IPC)
-const isTauri = '__TAURI_INTERNALS__' in window
+// 输入路径 4:屏幕选区 / 原生文件通道(仅桌面版;浏览器无 Tauri IPC)
 let lastRegionPngBase64 = ''
 if (isTauri) {
   regionButton.hidden = false
@@ -243,5 +307,17 @@ if (isTauri) {
     const bytes = new Uint8Array(bin.length)
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
     enqueueFiles([new File([bytes], '屏幕选区.png', { type: 'image/png' })], '屏幕选区')
+  })
+  // 桌面拖拽:原生拖放事件携带文件完整路径,经 read_image_files 读回字节;高亮跟随 enter/leave
+  void getCurrentWebview().onDragDropEvent(event => {
+    const payload = event.payload
+    if (payload.type === 'enter') {
+      appRoot.classList.add('dragging')
+    } else if (payload.type === 'drop') {
+      appRoot.classList.remove('dragging')
+      void handleImagePaths(payload.paths, '拖动')
+    } else if (payload.type === 'leave') {
+      appRoot.classList.remove('dragging')
+    }
   })
 }

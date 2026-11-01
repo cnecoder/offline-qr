@@ -11,6 +11,8 @@ export interface ResultItem {
   error?: string
   /** 识别来源:屏幕选区 / 文件 / 拖动 / 粘贴 / 历史回显 */
   source?: string
+  /** 源文件完整路径(桌面端文件/拖动来源;WebView2 经原生通道获取) */
+  filePath?: string
   /** 完成识别的时间戳(用于卡片标注日期时间) */
   completedAt?: number
 }
@@ -52,16 +54,20 @@ export function renderCard(item: ResultItem, options: ResultRenderOptions = {}):
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else {
-    // meta 行:时间在前、来源在后、"最新"徽标殿后——各卡片前缀信息保持对齐
+    // meta 行:时间在前、来源居中、源文件路径随后,"最新"徽标殿后——各卡片前缀信息保持对齐
     const meta = document.createElement('div')
     meta.className = 'card-meta'
-    if (item.completedAt) {
+    if (item.completedAt || item.source || item.filePath) {
       const stamp = document.createElement('span')
-      stamp.textContent = [formatDateTime(item.completedAt), item.source].filter(Boolean).join(' · ')
-      meta.append(stamp)
-    } else if (item.source) {
-      const stamp = document.createElement('span')
-      stamp.textContent = item.source
+      stamp.className = 'card-meta-text'
+      stamp.textContent = [
+        item.completedAt ? formatDateTime(item.completedAt) : '',
+        item.source ?? '',
+        item.filePath ?? '',
+      ]
+        .filter(Boolean)
+        .join(' · ')
+      stamp.title = stamp.textContent
       meta.append(stamp)
     }
     if (isLatest) meta.append(latestChip())
