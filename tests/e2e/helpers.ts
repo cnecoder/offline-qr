@@ -2,6 +2,22 @@
 // 无需 canvas 依赖,可在任意 CI 环境运行。
 import { deflateSync } from 'node:zlib'
 import QRCode from 'qrcode'
+import type { Page } from '@playwright/test'
+
+/** 在页面内合成剪贴板粘贴事件(与真实 Ctrl+V 走同一处理路径) */
+export async function pasteImage(page: Page, png: Buffer, name = 'shot.png'): Promise<void> {
+  await page.evaluate(
+    ({ base64, name }) => {
+      const bin = atob(base64)
+      const bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+      const dt = new DataTransfer()
+      dt.items.add(new File([bytes], name, { type: 'image/png' }))
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }))
+    },
+    { base64: png.toString('base64'), name },
+  )
+}
 
 const CRC_TABLE = new Int32Array(256)
 for (let n = 0; n < 256; n++) {

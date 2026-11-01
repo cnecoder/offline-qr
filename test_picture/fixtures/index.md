@@ -17,4 +17,6 @@
 | 10-inverted.png | `https://example.com/inverted` | 反色识别(tryInvert) |
 | 11-colored-dot.png | `https://example.com/colored-dot` | 彩色圆点风格 |
 | 12-tiny.png | `https://example.com/tiny` | 小尺寸码(约 70px) |
-| logo-sample.png | (不识别) | 测试图,可作任意图片输入 |
+| logo-sample.png | (不识别) | 在"生成"Tab 作 Logo 上传,验证挖孔与可扫性 |
+
+交叉验证:05 与"生成 Tab → Wi-Fi"填入相同 SSID/密码(SSID `net;,"x`,密码 `p:a,s\s`)应产出可互换的码。

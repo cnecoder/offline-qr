@@ -1,47 +1,30 @@
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { expect, test, type Page } from '@playwright/test'
-import { qrPng, solidPng } from './helpers'
+import { expect, test } from '@playwright/test'
+import { pasteImage, qrPng, solidPng } from './helpers'
 
 const RESULT_TEXT = '[data-testid="result-text"]'
-const HISTORY_TOGGLE = /最近识别/
 
-/** 在页面内合成剪贴板粘贴事件(与真实 Ctrl+V 走同一处理路径) */
-async function pasteImage(page: Page, png: Buffer, name = 'shot.png'): Promise<void> {
-  await page.evaluate(
-    ({ base64, name }) => {
-      const bin = atob(base64)
-      const bytes = new Uint8Array(bin.length)
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-      const dt = new DataTransfer()
-      dt.items.add(new File([bytes], name, { type: 'image/png' }))
-      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true }))
-    },
-    { base64: png.toString('base64'), name },
-  )
-}
-
-test.describe('二维码识别 · E2E(localhost)', () => {
+test.describe('极简二维码 · E2E(localhost)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: '二维码识别' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '极简二维码' })).toBeVisible()
   })
 
   test('页面加载:空态与关键元素齐全', async ({ page }) => {
     await expect(page.getByTestId('dropzone')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeVisible()
-    await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(0\)/)
+    // 识别 Tab 不再设"最近识别"底部条(结果卡片区即历史)
+    await expect(page.getByTestId('history-toggle')).toHaveCount(0)
     // 浏览器形态:屏幕选区按钮隐藏(仅桌面版提供)
     await expect(page.getByTestId('region-button')).toBeHidden()
   })
 
-  test('粘贴二维码截图:识别 URL,提供打开链接与复制', async ({ page }) => {
+  test('粘贴二维码截图:识别 URL 并提供复制', async ({ page }) => {
     await pasteImage(page, qrPng(['https://example.com/e2e-url']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/e2e-url')
-    await expect(page.getByTestId('open-link')).toHaveAttribute('href', 'https://example.com/e2e-url')
     await expect(page.getByTestId('copy-button')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeHidden()
-    await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(1\)/)
   })
 
   test('一图多码:全部识别(验收标准:一图三码)', async ({ page }) => {
@@ -58,21 +41,6 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.locator('.result-card.fail')).toContainText('未识别到二维码')
     await pasteImage(page, qrPng(['https://example.com/after-fail']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/after-fail')
-  })
-
-  test('识别历史:计数、展开、回显、清空', async ({ page }) => {
-    await pasteImage(page, qrPng(['https://example.com/history-1']))
-    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/history-1')
-
-    await page.getByRole('button', { name: HISTORY_TOGGLE }).click()
-    await expect(page.getByTestId('history-item')).toHaveCount(1)
-
-    await page.getByTestId('history-item').first().click()
-    await expect(page.locator(RESULT_TEXT).first()).toHaveText('https://example.com/history-1')
-
-    page.once('dialog', dialog => void dialog.accept())
-    await page.getByTestId('history-clear').click()
-    await expect(page.getByRole('button', { name: /最近识别\(0\)/ })).toBeVisible()
   })
 
   test('文件选择对话框路径(多选)', async ({ page }) => {
@@ -104,15 +72,48 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     const external = requests.filter(url => !url.startsWith('http://localhost:4173'))
     expect(external).toEqual([])
   })
+
+  test('清空识别记录:工具条二次确认后清空卡片区', async ({ page }) => {
+    await pasteImage(page, qrPng(['https://example.com/clear-me']))
+    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/clear-me')
+    await expect(page.getByTestId('clear-button')).toBeVisible()
+    // WebView2 无原生 confirm:二次点击确认
+    await page.getByTestId('clear-button').click()
+    await page.getByTestId('clear-button').click()
+    await expect(page.getByTestId('empty-hint')).toBeVisible()
+    await expect(page.getByTestId('clear-button')).toBeHidden()
+  })
+
+  test('配色主题:点击切换 黑绿 ↔ 黑黄 并持久化', async ({ page }) => {
+    const html = page.locator('html')
+    await expect(html).toHaveAttribute('data-theme', 'black-green')
+    await page.getByRole('button', { name: /配色/ }).click()
+    await expect(html).toHaveAttribute('data-theme', 'black-yellow')
+    await page.reload()
+    await expect(html).toHaveAttribute('data-theme', 'black-yellow')
+    await page.getByRole('button', { name: /配色/ }).click()
+    await expect(html).toHaveAttribute('data-theme', 'black-green')
+  })
+
+  test('结果卡片:识别完成自动全选,标注来源与精确时间', async ({ page }) => {
+    await pasteImage(page, qrPng(['https://example.com/auto-select']))
+    await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/auto-select')
+    // 识别完成默认全选文本块,可直接 Ctrl+C
+    const selected = await page.evaluate(() => window.getSelection()?.toString() ?? '')
+    expect(selected).toBe('https://example.com/auto-select')
+    await expect(page.locator('.result-card.latest')).toHaveCount(1)
+    // meta 行:时间在前(年月日 时:分:秒)、来源在后
+    await expect(page.locator('.card-meta').first()).toHaveText(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} · 粘贴/)
+  })
 })
 
-test.describe('二维码识别 · E2E(file:// 直开单文件产物)', () => {
+test.describe('极简二维码 · E2E(file:// 直开单文件产物)', () => {
   test('无需服务器:WASM 与 Worker 内联在 file:// 下完整工作', async ({ browser }) => {
     const fileUrl = pathToFileURL(path.resolve('./dist/index.html')).href
     const context = await browser.newContext()
     const page = await context.newPage()
     await page.goto(fileUrl)
-    await expect(page.getByRole('heading', { name: '二维码识别' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '极简二维码' })).toBeVisible()
     await pasteImage(page, qrPng(['https://example.com/file-uri']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/file-uri', {
       timeout: 15_000,

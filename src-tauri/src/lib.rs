@@ -1,9 +1,68 @@
-use std::io::Cursor;
-use std::sync::Mutex;
+use std::io::{Cursor, Write as _};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use base64::Engine as _;
+use chrono::Local as LocalTime;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_global_shortcut::{Builder as GlobalShortcutBuilder, GlobalShortcutExt, Shortcut, ShortcutState};
+
+static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+fn ensure_writable_dir(dir: &PathBuf) -> bool {
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    // 目录存在不代表可写(如 Program Files),做一次真实写探针
+    let probe = dir.join(".write-probe");
+    match std::fs::File::create(&probe) {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// 日志文件解析规则(用户约束):优先 exe 同级 logs\(绿色版 / debug 版);
+/// 不可写(安装版位于 Program Files)时回退应用数据目录。结果进程内缓存。
+fn log_file_path(app: &AppHandle) -> Option<PathBuf> {
+    LOG_FILE
+        .get_or_init(|| {
+            let date = LocalTime::now().format("%Y%m%d");
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(dir) = exe.parent() {
+                    let candidate = dir.join("logs");
+                    if ensure_writable_dir(&candidate) {
+                        return Some(candidate.join(format!("offlineqr-{date}.log")));
+                    }
+                }
+            }
+            let fallback = app.path().app_local_data_dir().ok()?.join("logs");
+            std::fs::create_dir_all(&fallback).ok()?;
+            Some(fallback.join(format!("offlineqr-{date}.log")))
+        })
+        .clone()
+}
+
+/// 追加一行到当天日志文件(FR-10:人类可读,毫秒精度)
+fn write_line(app: &AppHandle, line: &str) {
+    println!("{line}");
+    if let Some(path) = log_file_path(app) {
+        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
+            let _ = writeln!(file, "{line}");
+        }
+    }
+}
+
+fn log_event(app: &AppHandle, scope: &str, message: &str) {
+    let ts = LocalTime::now().format("%Y-%m-%d %H:%M:%S%.3f");
+    write_line(app, &format!("[{ts}][{scope}] {message}"));
+}
 
 #[derive(Serialize, Clone)]
 struct CaptureData {
@@ -12,17 +71,26 @@ struct CaptureData {
     png_base64: String,
 }
 
-#[derive(Default)]
-struct CaptureState(Mutex<Option<CaptureData>>);
+/// 单个显示器的截屏与其逻辑坐标(物理坐标 / 缩放比),用于遮罩窗口跨屏定位
+#[derive(Clone)]
+struct ScreenCapture {
+    data: CaptureData,
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+}
 
-/// 截取主显示器(位于原点的显示器;异常时退回第一个),返回 PNG 尺寸与 base64
-fn capture_primary_screen() -> Result<CaptureData, String> {
-    let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
-    let screen = screens
-        .iter()
-        .find(|s| s.display_info.x == 0 && s.display_info.y == 0)
-        .or_else(|| screens.first())
-        .ok_or("未找到可用显示器")?;
+#[derive(Default)]
+struct CaptureState(Mutex<Vec<ScreenCapture>>);
+
+/// 隐藏主窗后等待 DWM 重新合成桌面的时长:60Hz 下约 9 帧。
+/// hide() 立即改变窗口标志,但 DWM 在其后的合成帧才把窗口从桌面画面移除,
+/// GDI 全屏截图取的正是已合成帧——不留等待会把主窗截进选区底图,
+/// 遮罩窗展示底图时主窗就以"半透明残影"出现(Flameshot/Snipaste 同样留此等待)。
+const DWM_RECOMPOSE_WAIT: Duration = Duration::from_millis(150);
+
+fn capture_screen(screen: &screenshots::Screen) -> Result<CaptureData, String> {
     let image = screen.capture().map_err(|e| e.to_string())?;
     let (width, height) = (image.width(), image.height());
     let mut png = Cursor::new(Vec::new());
@@ -36,68 +104,374 @@ fn capture_primary_screen() -> Result<CaptureData, String> {
     })
 }
 
-fn close_overlay(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("region-overlay") {
-        let _ = window.close();
+/// 逐屏截屏;坐标换算为逻辑值(物理 / 缩放),供遮罩窗口跨屏定位。
+/// 多屏并行截屏以压缩总耗时。
+fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
+    let screens = screenshots::Screen::all().map_err(|e| e.to_string())?;
+    if screens.is_empty() {
+        return Err("未找到可用显示器".into());
     }
+    let results: Vec<Result<ScreenCapture, String>> = std::thread::scope(|scope| {
+        let handles: Vec<_> = screens
+            .iter()
+            .map(|screen| {
+                scope.spawn(move || {
+                    let data = capture_screen(screen)?;
+                    let scale = f64::from(screen.display_info.scale_factor).max(1.0);
+                    Ok(ScreenCapture {
+                        data,
+                        x: f64::from(screen.display_info.x) / scale,
+                        y: f64::from(screen.display_info.y) / scale,
+                        w: f64::from(screen.display_info.width) / scale,
+                        h: f64::from(screen.display_info.height) / scale,
+                    })
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|h| h.join().map_err(|e| format!("截屏线程崩溃:{e:?}")).and_then(|r| r))
+            .collect()
+    });
+    results.into_iter().collect()
 }
 
-/// 截屏 → 存状态 → 打开全屏遮罩窗口(前端进入选区模式)
-#[tauri::command]
-fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
-    let data = capture_primary_screen()?;
-    *state.0.lock().unwrap() = Some(data);
-    close_overlay(&app);
-    WebviewWindowBuilder::new(&app, "region-overlay", WebviewUrl::App("index.html".into()))
-        .title("屏幕选区")
-        .decorations(false)
-        .resizable(false)
-        .fullscreen(true)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .build()
-        .map_err(|e| e.to_string())?;
+/// 主窗显隐:hide/show 必须在主线程上同步执行(跨线程 ShowWindow 不可靠,
+/// 曾三次导致隐藏无效/截图带上主窗幽灵副本);run_on_main_thread 派发 + 标志位确认。
+fn set_main_window_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
+    let done = Arc::new(AtomicBool::new(false));
+    let flag = done.clone();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window("main") {
+            let result = if visible { window.show() } else { window.hide() };
+            match result {
+                Ok(_) => log_event(&handle, "capture", &format!("主窗{}", if visible { "已恢复显示" } else { "已隐藏(避免污染选区画面)" })),
+                Err(e) => log_event(&handle, "capture", &format!("主窗显隐失败:{e}")),
+            }
+        } else {
+            log_event(&handle, "capture", "未找到主窗(label 不匹配)");
+        }
+        flag.store(true, Ordering::SeqCst);
+    })
+    .map_err(|e| e.to_string())?;
+    let t0 = Instant::now();
+    while !done.load(Ordering::SeqCst) {
+        if t0.elapsed() > Duration::from_millis(500) {
+            log_event(app, "capture", "主窗显隐确认超时");
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
     Ok(())
 }
 
-/// 遮罩窗启动时取回截屏数据
-#[tauri::command]
-fn get_capture(state: State<'_, CaptureState>) -> Result<Option<CaptureData>, String> {
-    Ok(state.0.lock().unwrap().clone())
+fn close_all_overlays(app: &AppHandle) {
+    for (label, window) in app.webview_windows() {
+        if label.starts_with("region-overlay") {
+            let _ = window.close();
+            log_event(app, "capture", &format!("遮罩窗 {label} 已关闭"));
+        }
+    }
 }
 
-/// 选区完成:Rust 侧只做中转(裁剪由遮罩窗 canvas 完成),关闭窗口并广播给主窗
+/// 全局快捷键:显示/隐藏主窗(显隐必须主线程执行,与 set_main_window_visible 同款约束)
+fn toggle_main_window(app: &AppHandle) {
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window("main") {
+            let visible = window.is_visible().unwrap_or(false);
+            let result = if visible { window.hide() } else { window.show() };
+            match result {
+                Ok(_) => log_event(&handle, "hotkey", &format!("快捷键切换主窗{}", if visible { "隐藏" } else { "显示" })),
+                Err(e) => log_event(&handle, "hotkey", &format!("快捷键切换主窗失败:{e}")),
+            }
+        }
+    });
+}
+
+/// 逐屏截屏 → 存状态 → 每个显示器开一个遮罩窗口(均可独立框选)。
+/// 必须为 async:Windows 上在同步命令内创建窗口会死锁(命令阻塞主线程,
+/// 而窗口创建又依赖主线程事件循环),参考 Tauri 官方文档的 async command 指引。
 #[tauri::command]
-fn finish_capture(
-    app: AppHandle,
-    state: State<'_, CaptureState>,
-    png_base64: String,
-) -> Result<(), String> {
-    *state.0.lock().unwrap() = None;
-    close_overlay(&app);
+async fn start_capture(app: AppHandle) -> Result<(), String> {
+    let t0 = Instant::now();
+    log_event(&app, "capture", "开始屏幕截取");
+    // 先隐藏主窗(主线程同步执行):它不属于可选内容,且避免紫色 UI 出现在选区画面里
+    set_main_window_visible(&app, false)?;
+    log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
+    // 等待 DWM 把已隐藏的主窗从桌面合成中移除后再截屏,杜绝残影进入底图
+    std::thread::sleep(DWM_RECOMPOSE_WAIT);
+    log_event(&app, "capture", &format!("等待 DWM 重新合成 {}ms,开始截屏", DWM_RECOMPOSE_WAIT.as_millis()));
+    let captures = capture_all_screens()?;
+    let count = captures.len();
+    for (i, sc) in captures.iter().enumerate() {
+        log_event(
+            &app,
+            "capture",
+            &format!(
+                "屏幕 {i}: {}x{} px, 逻辑位置 ({:.0},{:.0}) 尺寸 {:.0}x{:.0}",
+                sc.data.width, sc.data.height, sc.x, sc.y, sc.w, sc.h
+            ),
+        );
+    }
+    *app.state::<CaptureState>().0.lock().unwrap() = captures;
+    close_all_overlays(&app);
+    for i in 0..count {
+        let screen = {
+            let state = app.state::<CaptureState>();
+            let guard = state.0.lock().unwrap();
+            guard[i].clone()
+        };
+        let label = format!("region-overlay-{i}");
+        WebviewWindowBuilder::new(
+            &app,
+            label.clone(),
+            WebviewUrl::App("index.html".into()),
+        )
+        .title(format!("屏幕选区 {}", i + 1))
+        .decorations(false)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .background_color(tauri::window::Color(0, 0, 0, 255))
+        .position(screen.x, screen.y)
+        .inner_size(screen.w, screen.h)
+        .build()
+        .map_err(|e| {
+            log_event(&app, "capture", &format!("遮罩窗 {label} 创建失败:{e}"));
+            e.to_string()
+        })?;
+        log_event(
+            &app,
+            "capture",
+            &format!(
+                "遮罩窗 {label} 已创建(即时可见,黑色首帧),({:.0},{:.0}) {:.0}x{:.0},累计 {}ms",
+                screen.x,
+                screen.y,
+                screen.w,
+                screen.h,
+                t0.elapsed().as_millis()
+            ),
+        );
+    }
+    log_event(
+        &app,
+        "capture",
+        &format!(
+            "全部遮罩创建完成(隐藏),共 {count} 屏,总耗时 {}ms;待前端就绪后显示",
+            t0.elapsed().as_millis()
+        ),
+    );
+    Ok(())
+}
+
+/// 遮罩窗启动时取回自己那一屏的截屏数据(按窗口序号)
+#[tauri::command]
+async fn get_capture(app: AppHandle, index: usize) -> Result<Option<CaptureData>, String> {
+    let capture = app
+        .state::<CaptureState>()
+        .0
+        .lock()
+        .unwrap()
+        .get(index)
+        .map(|s| s.data.clone());
+    match &capture {
+        Some(data) => log_event(
+            &app,
+            "capture",
+            &format!("遮罩窗 {index} 取图:{}x{},base64 {} 字符", data.width, data.height, data.png_base64.len()),
+        ),
+        None => log_event(&app, "capture", &format!("遮罩窗 {index} 取图失败:状态为空(可能非应用内发起)")),
+    }
+    Ok(capture)
+}
+
+/// 选区完成:Rust 侧只做中转(裁剪由遮罩窗 canvas 完成),关闭全部遮罩并广播给主窗
+#[tauri::command]
+async fn finish_capture(app: AppHandle, png_base64: String) -> Result<(), String> {
+    log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
+    *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
+    close_all_overlays(&app);
+    set_main_window_visible(&app, true)?;
     app.emit("region-captured", png_base64)
         .map_err(|e| e.to_string())
 }
 
-/// 取消选区
+/// 取消选区:关闭全部遮罩
 #[tauri::command]
-fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result<(), String> {
-    *state.0.lock().unwrap() = None;
-    close_overlay(&app);
+async fn cancel_capture(app: AppHandle) -> Result<(), String> {
+    log_event(&app, "capture", "选区取消");
+    *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
+    close_all_overlays(&app);
+    set_main_window_visible(&app, true)?;
     Ok(())
 }
 
-// 壳只负责窗口/打包/截屏:识别与历史等业务全部在前端完成。
+/// 识别失败的选区样张落盘(仅本地日志目录,用于定位裁剪内容问题)
+#[tauri::command]
+async fn dump_failed_region(app: AppHandle, png_base64: String) -> Result<String, String> {
+    let dir = log_file_path(&app)
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("failed-region-{}.png", LocalTime::now().format("%H%M%S%.3f")));
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&png_base64)
+        .map_err(|e| e.to_string())?;
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    log_event(&app, "capture", &format!("识别失败的选区样张已保存:{}", path.display()));
+    Ok(path.display().to_string())
+}
+
+/// 前端日志批量落盘(FR-10)
+#[tauri::command]
+async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
+    for line in &lines {
+        write_line(&app, line);
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct ReadImageFile {
+    path: String,
+    name: String,
+    ok: bool,
+    base64: String,
+    error: String,
+}
+
+/// 原生文件对话框选图(桌面):返回完整路径;WebView2 不向网页暴露文件路径,
+/// 必须经原生通道获取。取消/未选返回空列表。
+#[tauri::command]
+async fn pick_image_files(app: AppHandle) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let files = app
+            .dialog()
+            .file()
+            .add_filter("图片", &["png", "jpg", "jpeg", "bmp", "gif", "webp"])
+            .blocking_pick_files();
+        Ok(files.unwrap_or_default().iter().map(|f| f.to_string()).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 按路径读取图片文件(桌面拖放/对话框路径 → base64;原生拖放事件只给路径不给句柄)
+#[tauri::command]
+async fn read_image_files(paths: Vec<String>) -> Result<Vec<ReadImageFile>, String> {
+    let mut results = Vec::new();
+    for path in paths {
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.clone());
+        match std::fs::read(&path) {
+            Ok(bytes) => results.push(ReadImageFile {
+                path: path.clone(),
+                name,
+                ok: true,
+                base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+                error: String::new(),
+            }),
+            Err(e) => results.push(ReadImageFile {
+                path: path.clone(),
+                name,
+                ok: false,
+                base64: String::new(),
+                error: e.to_string(),
+            }),
+        }
+    }
+    Ok(results)
+}
+
+// 壳负责窗口/打包/截屏:识别与生成等业务全部在前端完成。
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .manage(CaptureState::default())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            GlobalShortcutBuilder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+                    let region = "alt+q".parse::<Shortcut>().unwrap();
+                    let toggle = "alt+w".parse::<Shortcut>().unwrap();
+                    let app = app.clone();
+                    if shortcut == &region {
+                        tauri::async_runtime::spawn(async move {
+                            log_event(&app, "hotkey", "全局快捷键 Alt+Q 触发屏幕选区");
+                            if let Err(e) = start_capture(app.clone()).await {
+                                log_event(&app, "hotkey", &format!("快捷键发起选区失败:{e}"));
+                            }
+                        });
+                    } else if shortcut == &toggle {
+                        toggle_main_window(&app);
+                    }
+                })
+                .build(),
+        )
+        .setup(|app| {
+            let handle = app.handle().clone();
+
+            // 构建标记:标题栏显示构建时间,日志记录 exe 自身文件时间——用于确认运行的构建版本
+            let build_ts: u64 = option_env!("BUILD_UNIX").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let build_label = if build_ts > 0 {
+                use chrono::TimeZone as _;
+                chrono::Local
+                    .timestamp_opt(build_ts as i64, 0)
+                    .earliest()
+                    .map(|dt| dt.format("%m%d %H:%M:%S").to_string())
+                    .unwrap_or_else(|| format!("unix:{build_ts}"))
+            } else {
+                "未知".into()
+            };
+            let exe_meta = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.metadata().ok())
+                .and_then(|m| m.modified().ok())
+                .map(|t| {
+                    let dt: chrono::DateTime<LocalTime> = t.into();
+                    dt.format("%H:%M:%S").to_string()
+                })
+                .unwrap_or_else(|| "?".into());
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&format!("极简二维码 [构建 {build_label} · exe {exe_meta}]"));
+            }
+            log_event(
+                &handle,
+                "app",
+                &format!(
+                    "应用启动 v{},构建 {build_label},exe 修改时间 {exe_meta},日志文件:{}",
+                    app.package_info().version,
+                    log_file_path(&handle)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "不可用".into())
+                ),
+            );
+            // 全局快捷键:Alt+Q 屏幕选区识别,Alt+W 显示/隐藏主窗(冲突时降级为仅应用内可用)
+            for (combo, desc) in [("alt+q", "屏幕选区识别"), ("alt+w", "显示/隐藏主窗")] {
+                match handle.global_shortcut().register(combo) {
+                    Ok(_) => log_event(&handle, "hotkey", &format!("已注册全局快捷键 {combo}({desc})")),
+                    Err(e) => log_event(&handle, "hotkey", &format!("注册全局快捷键 {combo}({desc})失败,可能被其他程序占用:{e}")),
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             start_capture,
             get_capture,
             finish_capture,
-            cancel_capture
+            cancel_capture,
+            append_log,
+            dump_failed_region,
+            pick_image_files,
+            read_image_files
         ])
         .run(tauri::generate_context!())
-        .expect("QrTool 运行失败");
+        .expect("OfflineQR 运行失败");
 }

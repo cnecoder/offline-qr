@@ -5,6 +5,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import QRCode from 'qrcode'
+import { contentToText } from '../src/generator/content.ts'
 import { encodePng } from '../tests/e2e/helpers.ts'
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'test_picture', 'fixtures')
@@ -93,35 +94,29 @@ function save(name, image) {
   console.log('generated:', name)
 }
 
-// ---- 内容(recognition 分支无生成模块,直接使用编码后的字面量;
-// 与 recognition-generation 分支 content.test.ts 断言的编码保持一致)----
-const WIFI_WPA = 'WIFI:T:WPA;S:HomeNet;P:pass123;;'
-const WIFI_ESCAPED = 'WIFI:T:WPA;S:net\\;\\,\\"x;P:p\\:a\\,s\\\\s;;'
-const WIFI_NOPASS = 'WIFI:T:nopass;S:OpenNet;;'
-const VCARD = [
-  'BEGIN:VCARD',
-  'VERSION:3.0',
-  'N:;张三;;;',
-  'FN:张三',
-  'ORG:示例科技',
-  'TITLE:工程师',
-  'TEL;TYPE=CELL:13800138000',
-  'TEL;TYPE=WORK:010-12345678',
-  'EMAIL:zhangsan@example.com',
-  'URL:https://example.com',
-  'ADR;TYPE=WORK:;;北京市海淀区中关村大街 1 号;;;;',
-  'END:VCARD',
-].join('\r\n')
+// ---- 内容(复用应用的模板编码,保证与"生成 Tab"产出一致)----
+const wifi = (ssid, password, encryption = 'WPA', hidden = false) => ({ kind: 'wifi', ssid, password, encryption, hidden })
+const vcard = {
+  kind: 'vcard',
+  name: '张三',
+  mobile: '13800138000',
+  phone: '010-12345678',
+  email: 'zhangsan@example.com',
+  org: '示例科技',
+  title: '工程师',
+  url: 'https://example.com',
+  address: '北京市海淀区中关村大街 1 号',
+}
 const longText = Array.from({ length: 12 }, (_, i) => `第 ${i + 1} 行:二维码工具离线测试内容 abcdefghijklmnopqrstuvwxyz-${i}`).join('\n')
 
 // ---- 样张 ----
 save('01-text-url.png', qrRgba('https://example.com/qr-manual-test'))
 save('02-text-chinese.png', qrRgba('你好,二维码工具!\n第二行:离线识别测试'))
 save('03-text-long.png', qrRgba(longText))
-save('04-wifi-wpa.png', qrRgba(WIFI_WPA))
-save('05-wifi-escaped.png', qrRgba(WIFI_ESCAPED))
-save('06-wifi-nopass.png', qrRgba(WIFI_NOPASS))
-save('07-vcard.png', qrRgba(VCARD))
+save('04-wifi-wpa.png', qrRgba(contentToText(wifi('HomeNet', 'pass123'))))
+save('05-wifi-escaped.png', qrRgba(contentToText(wifi('net;,"x', 'p:a,s\\s'))))
+save('06-wifi-nopass.png', qrRgba(contentToText(wifi('OpenNet', '', 'nopass'))))
+save('07-vcard.png', qrRgba(contentToText(vcard)))
 save(
   '08-multi-3codes.png',
   composeH([
