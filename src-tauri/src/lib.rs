@@ -1,7 +1,8 @@
 use std::io::{Cursor, Write as _};
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
-use std::time::Instant;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use chrono::Local as LocalTime;
@@ -156,12 +157,19 @@ async fn start_capture(app: AppHandle, state: State<'_, CaptureState>) -> Result
     log_event(&app, "capture", "开始屏幕截取");
     // 先隐藏主窗:它不属于可选内容,且避免紫色 UI 出现在选区画面里
     set_main_window_visible(&app, false);
-    // hide 是异步派发的:等主窗真正从屏幕上消失再截屏,否则截图会带上主窗"幽灵副本"
-    for _ in 0..20 {
-        match app.get_webview_window("main").map(|w| w.is_visible()) {
-            Some(Ok(false)) => break,
-            _ => std::thread::sleep(std::time::Duration::from_millis(25)),
+    // hide 是异步派发的:用主线程有序回调确认 hide 已被事件循环处理(等待 ≤500ms),
+    // 否则截屏会带上主窗"幽灵副本"(is_visible 轮询不可靠,tao 返回内部标志)
+    let hidden = Arc::new(AtomicBool::new(false));
+    let hidden_flag = hidden.clone();
+    app.run_on_main_thread(move || hidden_flag.store(true, Ordering::SeqCst))
+        .map_err(|e| e.to_string())?;
+    let wait_start = Instant::now();
+    while !hidden.load(Ordering::SeqCst) {
+        if wait_start.elapsed() > Duration::from_millis(500) {
+            log_event(&app, "capture", "主窗隐藏确认超时(继续截屏)");
+            break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(10));
     }
     log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
     let captures = capture_all_screens()?;
@@ -292,11 +300,7 @@ async fn cancel_capture(app: AppHandle, state: State<'_, CaptureState>) -> Resul
 
 /// 识别失败的选区样张落盘(仅本地日志目录,用于定位裁剪内容问题)
 #[tauri::command]
-async fn dump_failed_region(
-    app: AppHandle,
-    state: State<'_, CaptureState>,
-    png_base64: String,
-) -> Result<String, String> {
+async fn dump_failed_region(app: AppHandle, png_base64: String) -> Result<String, String> {
     let dir = log_file_path(&app)
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .unwrap_or_else(|| PathBuf::from("."));

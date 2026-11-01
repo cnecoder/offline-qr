@@ -12,14 +12,15 @@ const workerScope = self as unknown as WorkerScope
 workerScope.onmessage = async (event: MessageEvent<DecodeRequest>) => {
   const { id, bitmap } = event.data
   try {
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height)
+    // 四周垫 24px 白色静区:应对选区贴近二维码、安静区被裁掉的情况
+    const pad = 24
+    const canvas = new OffscreenCanvas(bitmap.width + pad * 2, bitmap.height + pad * 2)
     const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) throw new Error('无法创建离屏画布上下文')
-    // 透明像素对解码器等于纯黑,先垫白底再绘制
     ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, bitmap.width, bitmap.height)
-    ctx.drawImage(bitmap, 0, 0)
-    const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bitmap, pad, pad)
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
     bitmap.close()
     const texts = await decodePixels(pixels)
     workerScope.postMessage({ id, ok: true, texts })

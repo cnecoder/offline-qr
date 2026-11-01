@@ -44,7 +44,7 @@ export function renderCard(item: ResultItem, handlers: ResultHandlers = {}): HTM
   if (item.state === 'pending') {
     body.append(message('识别中…'))
   } else if (item.state === 'failed') {
-    body.append(message('未识别到二维码'))
+    body.append(message('未识别到二维码(请确认选区完整包含二维码及其四周留白)'))
   } else {
     for (const text of item.texts) body.append(textBlock(text, handlers))
   }

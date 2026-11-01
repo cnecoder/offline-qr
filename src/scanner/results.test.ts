@@ -38,7 +38,7 @@ describe('renderCard', () => {
   it('failed 卡:灰显提示且无操作按钮', () => {
     const card = renderCard(item({ state: 'failed', texts: [] }))
     expect(card.className).toContain('fail')
-    expect(card.querySelector('.card-msg')?.textContent).toBe('未识别到二维码')
+    expect(card.querySelector('.card-msg')?.textContent).toContain('未识别到二维码')
     expect(card.querySelector('[data-testid="copy-button"]')).toBeNull()
     expect(card.querySelector('[data-testid="open-link"]')).toBeNull()
   })
