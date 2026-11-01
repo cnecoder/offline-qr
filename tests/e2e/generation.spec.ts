@@ -142,8 +142,8 @@ test.describe('生成 Tab · 深度自定义与美化', () => {
     // 点击 Wi-Fi 条目 → 表单恢复
     await page.getByTestId('gen-history-item').first().click()
     await expect(page.locator('#gen-wifi-ssid')).toHaveValue('HistNet')
-    // 清空
-    page.once('dialog', dialog => void dialog.accept())
+    // 清空(二次点击确认,WebView2 无原生 confirm)
+    await page.getByTestId('gen-history-clear').click()
     await page.getByTestId('gen-history-clear').click()
     await expect(page.getByTestId('gen-history-toggle')).toHaveText(/最近生成\(0\)/)
   })

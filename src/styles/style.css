@@ -101,6 +101,7 @@ button.primary:hover { opacity: 0.92; color: #fff; }
   cursor: pointer;
   text-decoration: underline;
 }
+.link-button.danger { color: var(--danger); font-weight: 600; }
 
 /* 进度行 */
 .progress {

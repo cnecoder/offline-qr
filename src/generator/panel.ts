@@ -195,11 +195,26 @@ export function initGeneratePanel(): void {
     historyOpen = !historyOpen
     renderGenHistory()
   })
+  // WebView2 禁用原生脚本对话框(confirm 恒 false),改用应用内二次点击确认
+  let genClearArmed = false
+  let genClearArmTimer: number | undefined
+  function disarmGenClear(): void {
+    genClearArmed = false
+    window.clearTimeout(genClearArmTimer)
+    historyClear.textContent = '清空'
+    historyClear.classList.remove('danger')
+  }
   historyClear.addEventListener('click', () => {
-    if (window.confirm('确定清空全部生成历史?')) {
-      genHistory.clear()
-      renderGenHistory()
+    if (!genClearArmed) {
+      genClearArmed = true
+      historyClear.textContent = '再点一次确认清空'
+      historyClear.classList.add('danger')
+      genClearArmTimer = window.setTimeout(disarmGenClear, 3000)
+      return
     }
+    disarmGenClear()
+    genHistory.clear()
+    renderGenHistory()
   })
 
   // ---- 样式状态 ----

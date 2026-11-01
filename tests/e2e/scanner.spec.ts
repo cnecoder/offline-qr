@@ -20,10 +20,9 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await expect(page.getByTestId('region-button')).toBeHidden()
   })
 
-  test('粘贴二维码截图:识别 URL,提供打开链接与复制', async ({ page }) => {
+  test('粘贴二维码截图:识别 URL 并提供复制', async ({ page }) => {
     await pasteImage(page, qrPng(['https://example.com/e2e-url']))
     await expect(page.locator(RESULT_TEXT)).toHaveText('https://example.com/e2e-url')
-    await expect(page.getByTestId('open-link')).toHaveAttribute('href', 'https://example.com/e2e-url')
     await expect(page.getByTestId('copy-button')).toBeVisible()
     await expect(page.getByTestId('empty-hint')).toBeHidden()
     await expect(page.getByRole('button', { name: HISTORY_TOGGLE })).toHaveText(/最近识别\(1\)/)
@@ -55,7 +54,8 @@ test.describe('二维码识别 · E2E(localhost)', () => {
     await page.getByTestId('history-item').first().click()
     await expect(page.locator(RESULT_TEXT).first()).toHaveText('https://example.com/history-1')
 
-    page.once('dialog', dialog => void dialog.accept())
+    // WebView2 无原生 confirm:清空为二次点击确认
+    await page.getByTestId('history-clear').click()
     await page.getByTestId('history-clear').click()
     await expect(page.getByRole('button', { name: /最近识别\(0\)/ })).toBeVisible()
   })

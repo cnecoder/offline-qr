@@ -270,11 +270,28 @@ historyToggle.addEventListener('click', () => {
   historyOpen = !historyOpen
   renderHistory()
 })
+// WebView2 默认禁用原生脚本对话框,window.confirm 恒返回 false(清空从未执行)——
+// 改用应用内二次点击确认,3 秒未确认自动解除
+let clearArmed = false
+let clearArmTimer: number | undefined
+function disarmHistoryClear(): void {
+  clearArmed = false
+  window.clearTimeout(clearArmTimer)
+  historyClear.textContent = '清空'
+  historyClear.classList.remove('danger')
+}
 historyClear.addEventListener('click', () => {
-  if (window.confirm('确定清空全部识别历史?')) {
-    history.clear()
-    renderHistory()
+  if (!clearArmed) {
+    clearArmed = true
+    historyClear.textContent = '再点一次确认清空'
+    historyClear.classList.add('danger')
+    clearArmTimer = window.setTimeout(disarmHistoryClear, 3000)
+    return
   }
+  disarmHistoryClear()
+  history.clear()
+  renderHistory()
+  flashToast('已清空识别历史')
 })
 
 renderHistory()
