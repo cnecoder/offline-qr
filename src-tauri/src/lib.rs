@@ -1,6 +1,6 @@
 use std::io::{Cursor, Write as _};
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 use std::time::Instant;
 
 use base64::Engine as _;
@@ -8,15 +8,48 @@ use chrono::Local as LocalTime;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
+static LOG_FILE: OnceLock<Option<PathBuf>> = OnceLock::new();
+
+fn ensure_writable_dir(dir: &PathBuf) -> bool {
+    if std::fs::create_dir_all(dir).is_err() {
+        return false;
+    }
+    // 目录存在不代表可写(如 Program Files),做一次真实写探针
+    let probe = dir.join(".write-probe");
+    match std::fs::File::create(&probe) {
+        Ok(_) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// 日志文件解析规则(用户约束):优先 exe 同级 logs\(绿色版 / debug 版);
+/// 不可写(安装版位于 Program Files)时回退应用数据目录。结果进程内缓存。
+fn log_file_path(app: &AppHandle) -> Option<PathBuf> {
+    LOG_FILE
+        .get_or_init(|| {
+            let date = LocalTime::now().format("%Y%m%d");
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(dir) = exe.parent() {
+                    let candidate = dir.join("logs");
+                    if ensure_writable_dir(&candidate) {
+                        return Some(candidate.join(format!("qr-tool-{date}.log")));
+                    }
+                }
+            }
+            let fallback = app.path().app_local_data_dir().ok()?.join("logs");
+            std::fs::create_dir_all(&fallback).ok()?;
+            Some(fallback.join(format!("qr-tool-{date}.log")))
+        })
+        .clone()
+}
+
 /// 追加一行到当天日志文件(FR-10:人类可读,毫秒精度)
 fn write_line(app: &AppHandle, line: &str) {
     println!("{line}");
-    let path: Option<PathBuf> = (|| {
-        let dir = app.path().app_local_data_dir().ok()?.join("logs");
-        std::fs::create_dir_all(&dir).ok()?;
-        Some(dir.join(format!("qr-tool-{}.log", LocalTime::now().format("%Y%m%d"))))
-    })();
-    if let Some(path) = path {
+    if let Some(path) = log_file_path(app) {
         if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
             let _ = writeln!(file, "{line}");
         }
@@ -214,6 +247,17 @@ async fn append_log(app: AppHandle, lines: Vec<String>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(CaptureState::default())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            log_event(&handle, "app", &format!(
+                "应用启动 v{},日志文件:{}",
+                app.package_info().version,
+                log_file_path(&handle)
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "不可用".into())
+            ));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             start_capture,
             get_capture,

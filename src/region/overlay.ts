@@ -3,6 +3,10 @@ import { log } from '../shared/log'
 import { toImageRect } from './crop'
 import { overlayIndexFromLabel, createSelection, type Rect } from './selection'
 
+// 全局异常兜底:未捕获异常/未处理 Promise 拒绝进入诊断日志
+window.addEventListener('error', event => log('window', `未捕获异常:${event.message}`))
+window.addEventListener('unhandledrejection', event => log('window', `未处理的 Promise 拒绝:${String(event.reason)}`))
+
 interface CaptureData {
   width: number
   height: number
