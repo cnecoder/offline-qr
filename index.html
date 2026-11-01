@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='18' fill='%234f46e5'/><rect x='18' y='18' width='26' height='26' rx='4' fill='white'/><rect x='56' y='18' width='26' height='26' rx='4' fill='white'/><rect x='18' y='56' width='26' height='26' rx='4' fill='white'/><rect x='58' y='58' width='10' height='10' fill='white'/><rect x='72' y='72' width='10' height='10' fill='white'/></svg>" />
     <title>二维码识别</title>
+    <style>
+      /* 遮罩窗口关键样式内联:在任何 JS/CSS 加载前生效,杜绝无样式闪烁 */
+      html.overlay-mode { background: #000; }
+      html.overlay-mode .app { display: none; }
+    </style>
     <script>
       // 遮罩窗口(region-overlay-*):首帧前隐藏应用 UI,遮罩窗内只应存在选区层
       (function () {

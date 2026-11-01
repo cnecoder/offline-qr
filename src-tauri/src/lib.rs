@@ -1,7 +1,8 @@
 use std::io::{Cursor, Write as _};
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
-use std::time::Instant;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use base64::Engine as _;
 use chrono::Local as LocalTime;
@@ -127,6 +128,36 @@ fn capture_all_screens() -> Result<Vec<ScreenCapture>, String> {
     results.into_iter().collect()
 }
 
+/// 主窗显隐:hide/show 必须在主线程上同步执行(跨线程 ShowWindow 不可靠,
+/// 曾三次导致隐藏无效/截图带上主窗幽灵副本);run_on_main_thread 派发 + 标志位确认。
+fn set_main_window_visible(app: &AppHandle, visible: bool) -> Result<(), String> {
+    let done = Arc::new(AtomicBool::new(false));
+    let flag = done.clone();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(window) = handle.get_webview_window("main") {
+            let result = if visible { window.show() } else { window.hide() };
+            match result {
+                Ok(_) => log_event(&handle, "capture", &format!("主窗{}", if visible { "已恢复显示" } else { "已隐藏(避免污染选区画面)" })),
+                Err(e) => log_event(&handle, "capture", &format!("主窗显隐失败:{e}")),
+            }
+        } else {
+            log_event(&handle, "capture", "未找到主窗(label 不匹配)");
+        }
+        flag.store(true, Ordering::SeqCst);
+    })
+    .map_err(|e| e.to_string())?;
+    let t0 = Instant::now();
+    while !done.load(Ordering::SeqCst) {
+        if t0.elapsed() > Duration::from_millis(500) {
+            log_event(app, "capture", "主窗显隐确认超时");
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    Ok(())
+}
+
 fn close_all_overlays(app: &AppHandle) {
     for (label, window) in app.webview_windows() {
         if label.starts_with("region-overlay") {
@@ -143,6 +174,9 @@ fn close_all_overlays(app: &AppHandle) {
 async fn start_capture(app: AppHandle) -> Result<(), String> {
     let t0 = Instant::now();
     log_event(&app, "capture", "开始屏幕截取");
+    // 先隐藏主窗(主线程同步执行):它不属于可选内容,且避免紫色 UI 出现在选区画面里
+    set_main_window_visible(&app, false)?;
+    log_event(&app, "capture", &format!("主窗隐藏确认,累计 {}ms", t0.elapsed().as_millis()));
     let captures = capture_all_screens()?;
     let count = captures.len();
     for (i, sc) in captures.iter().enumerate() {
@@ -233,6 +267,7 @@ async fn finish_capture(app: AppHandle, png_base64: String) -> Result<(), String
     log_event(&app, "capture", &format!("选区完成,回传 PNG base64 {} 字符", png_base64.len()));
     *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
+    set_main_window_visible(&app, true)?;
     app.emit("region-captured", png_base64)
         .map_err(|e| e.to_string())
 }
@@ -243,6 +278,7 @@ async fn cancel_capture(app: AppHandle) -> Result<(), String> {
     log_event(&app, "capture", "选区取消");
     *app.state::<CaptureState>().0.lock().unwrap() = Vec::new();
     close_all_overlays(&app);
+    set_main_window_visible(&app, true)?;
     Ok(())
 }
 
@@ -278,13 +314,42 @@ pub fn run() {
         .manage(CaptureState::default())
         .setup(|app| {
             let handle = app.handle().clone();
-            log_event(&handle, "app", &format!(
-                "应用启动 v{},日志文件:{}",
-                app.package_info().version,
-                log_file_path(&handle)
-                    .map(|p| p.display().to_string())
-                    .unwrap_or_else(|| "不可用".into())
-            ));
+
+            // 构建标记:标题栏显示构建时间,日志记录 exe 自身文件时间——用于确认运行的构建版本
+            let build_ts: u64 = option_env!("BUILD_UNIX").and_then(|s| s.parse().ok()).unwrap_or(0);
+            let build_label = if build_ts > 0 {
+                use chrono::TimeZone as _;
+                chrono::Local
+                    .timestamp_opt(build_ts as i64, 0)
+                    .earliest()
+                    .map(|dt| dt.format("%m%d %H:%M:%S").to_string())
+                    .unwrap_or_else(|| format!("unix:{build_ts}"))
+            } else {
+                "未知".into()
+            };
+            let exe_meta = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.metadata().ok())
+                .and_then(|m| m.modified().ok())
+                .map(|t| {
+                    let dt: chrono::DateTime<LocalTime> = t.into();
+                    dt.format("%H:%M:%S").to_string()
+                })
+                .unwrap_or_else(|| "?".into());
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_title(&format!("二维码识别 [构建 {build_label} · exe {exe_meta}]"));
+            }
+            log_event(
+                &handle,
+                "app",
+                &format!(
+                    "应用启动 v{},构建 {build_label},exe 修改时间 {exe_meta},日志文件:{}",
+                    app.package_info().version,
+                    log_file_path(&handle)
+                        .map(|p| p.display().to_string())
+                        .unwrap_or_else(|| "不可用".into())
+                ),
+            );
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
